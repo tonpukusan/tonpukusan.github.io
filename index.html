@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>マルチSNS投稿ハブ（Amazon/Rakuten/Yahoo対応版）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<style>
+body{
+  font-family:system-ui,sans-serif;
+  margin:0;
+  padding:20px;
+  background:#fff;
+}
+.container{
+  max-width:600px;
+  margin:auto;
+}
+textarea,input[type="text"]{
+  width:100%;
+  padding:10px;
+  font-size:1rem;
+  margin-bottom:10px;
+}
+textarea{
+  height:150px;
+}
+button{
+  padding:12px 16px;
+  margin:6px 0;
+  font-size:1.1rem;
+  cursor:pointer;
+  width:100%;
+}
+#snsButtons{
+  margin-top:20px;
+  display:none;
+}
+.sns-btn{
+  margin-bottom:10px;
+}
+.note{
+  font-size:.85rem;
+  color:#555;
+  margin-bottom:8px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>マルチSNS投稿ハブ</h2>
+
+  <div class="note">
+    PC：ブックマークレットから開くとタイトル＋URLが自動で入ります。<br>
+    Android：共有メニューから「投稿ハブ」を選ぶとURLが自動入力されます。
+  </div>
+
+  <input type="text" id="urlInput" placeholder="スマホではここに商品URLが自動入力されます（Amazon / Rakuten / Yahoo）">
+
+  <button id="generate">投稿文を生成</button>
+
+  <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
+
+  <button id="showSNS">投稿</button>
+  <button id="closeAll" style="background:#ff4d4d;color:#fff;">すべて閉じる</button>
+
+  <div id="snsButtons">
+    <button class="sns-btn" id="btnX">X に投稿</button>
+    <button class="sns-btn" id="btnThreads">Threads に投稿</button>
+    <button class="sns-btn" id="btnBsky">Bluesky に投稿</button>
+    <button class="sns-btn" id="btnFb">Facebook に投稿</button>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  let winX=null,winThreads=null,winBsky=null,winFb=null;
+  const textarea=document.getElementById("text");
+  const urlInput=document.getElementById("urlInput");
+
+  const params=new URLSearchParams(location.search);
+
+  const textParam=params.get("text")||"";
+  const sharedUrl=params.get("url")||"";
+  const sharedText=params.get("text")||"";
+  const sharedTitle=params.get("title")||"";
+
+  if(textParam){
+    textarea.value=textParam;
+  }else if(sharedTitle || sharedText){
+    let combined="";
+    if(sharedTitle) combined+=sharedTitle;
+    if(sharedText){
+      if(combined) combined+="\n";
+      combined+=sharedText;
+    }
+    textarea.value=combined;
+  }
+
+  if(sharedUrl){
+    urlInput.value=sharedUrl;
+  }
+
+  function cleanAmazonTitle(title){
+    if(!title) return "";
+    title=title.replace(/^Amazon\.co\.jp:\s*/i,"");
+    title=title.replace(/\s*:\s*[^:]+$/,"");
+    return title.trim();
+  }
+
+  function generateAmazonLink(url){
+    if(!url.includes("amazon.co.jp")) return null;
+    let asin=null;
+    let m1=url.match(/\/dp\/([A-Z0-9]{10})/i);
+    let m2=url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+    let m3=url.match(/\/product\/([A-Z0-9]{10})/i);
+    if(m1) asin=m1[1];
+    if(m2) asin=m2[1];
+    if(m3) asin=m3[1];
+
+    if(asin){
+      return "https://www.amazon.co.jp/dp/"+asin+"?tag=yusatosh-22";
+    }
+    return url+(url.includes("?")?"&":"?")+"tag=yusatosh-22";
+  }
+
+  function generateRakutenLink(url){
+    if(!/rakuten\.(co\.jp|ne\.jp)/.test(url)) return null;
+    let base="https://hb.afl.rakuten.co.jp/hgc/15844848.ec827d24.15844849.84443345/";
+    return base+"?pc="+encodeURIComponent(url)+"&link_type=hybrid_url";
+  }
+
+  function generateYahooLink(url){
+    if(
+      url.includes("store.shopping.yahoo.co.jp") ||
+      (url.includes("shopping.yahoo.co.jp") &&
+       (url.includes("/search") || url.includes("/promotion") || url.includes("/product")))
+    ){
+      return "https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
+    }
+    return null;
+  }
+
+  function generateFromURL(url,rawTitle){
+    if(!url) return "";
+
+    let amazon=generateAmazonLink(url);
+    if(amazon){
+      let title=cleanAmazonTitle(rawTitle);
+      if(title){
+        return "#密林偵察 #Amazonセール情報 #AD\n"+title+"\n"+amazon;
+      }else{
+        return "#密林偵察 #Amazonセール情報 #AD\n"+amazon;
+      }
+    }
+
+    let rakuten=generateRakutenLink(url);
+    if(rakuten){
+      if(rawTitle){
+        return "#楽天偵察 #セール情報 #AD\n"+rawTitle+"\n"+rakuten;
+      }else{
+        return "#楽天偵察 #セール情報 #AD\n"+rakuten;
+      }
+    }
+
+    let yahoo=generateYahooLink(url);
+    if(yahoo){
+      if(rawTitle){
+        return "#Yahoo偵察 #AD\n"+rawTitle+"\n"+yahoo;
+      }else{
+        return "#Yahoo偵察 #AD\n"+yahoo;
+      }
+    }
+
+    if(rawTitle){
+      return rawTitle+"\n"+url;
+    }else{
+      return url;
+    }
+  }
+
+  document.getElementById("generate").onclick=()=>{
+    let raw=textarea.value.trim();
+    let title="";
+    let url="";
+
+    if(raw){
+      let lines=raw.split("\n");
+      if(lines.length>=2){
+        title=lines[0].trim();
+        url=lines[1].trim();
+      }
+    }
+
+    if(!url){
+      url=urlInput.value.trim();
+    }
+
+    if(!url){
+      return;
+    }
+
+    if(generateYahooLink(url)){
+      document.getElementById("btnThreads").style.display="none";
+      document.getElementById("btnBsky").style.display="none";
+      document.getElementById("btnFb").style.display="none";
+    }else{
+      document.getElementById("btnThreads").style.display="block";
+      document.getElementById("btnBsky").style.display="block";
+      document.getElementById("btnFb").style.display="block";
+    }
+
+    textarea.value=generateFromURL(url,title);
+  };
+
+  document.getElementById("showSNS").onclick=async()=>{
+    try{
+      await navigator.clipboard.writeText(textarea.value);
+    }catch(e){}
+    document.getElementById("snsButtons").style.display="block";
+  };
+
+  document.getElementById("btnX").onclick=()=>{
+    winX=window.open(
+      "https://twitter.com/intent/tweet?text="+encodeURIComponent(textarea.value),
+      "SNS_X"
+    );
+  };
+
+  document.getElementById("btnThreads").onclick=()=>{
+    winThreads=window.open(
+      "https://www.threads.net/intent/post",
+      "SNS_THREADS"
+    );
+  };
+
+  document.getElementById("btnBsky").onclick=()=>{
+    winBsky=window.open("https://bsky.app","SNS_BSKY");
+  };
+
+  document.getElementById("btnFb").onclick=()=>{
+    winFb=window.open(
+      "https://www.facebook.com/home.php",
+      "SNS_FB"
+    );
+  };
+
+  function closeAll(){
+    [winX,winThreads,winBsky,winFb].forEach(w=>{
+      if(w && !w.closed) w.close();
+    });
+  }
+  document.getElementById("closeAll").onclick=()=>{
+    closeAll();
+    window.close();
+  };
+  window.addEventListener("beforeunload",closeAll);
+
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js');
+  });
+}
+</script>
+
+</body>
+</html>
