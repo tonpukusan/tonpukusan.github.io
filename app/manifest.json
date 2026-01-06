@@ -1,11 +1,13 @@
 {
+  "id": "/app/",
   "name": "マルチSNS投稿ハブ",
   "short_name": "投稿ハブ",
-  "start_url": "/app/",
+  "start_url": "/app/index.html",
   "scope": "/app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/app/icon-192.png",
@@ -19,7 +21,7 @@
     }
   ],
   "share_target": {
-    "action": "/app/",
+    "action": "/app/index.html",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
