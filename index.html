@@ -102,13 +102,36 @@ button{
     urlInput.value=sharedUrl;
   }
 
-  function cleanAmazonTitle(title){
-    if(!title) return "";
-    title=title.replace(/^Amazon\.co\.jp:\s*/i,"");
-    title=title.replace(/\s*:\s*[^:]+$/,"");
-    return title.trim();
+function cleanAmazonTitle(title){
+  if(!title) return "";
+
+  // 1. 先頭の "Amazon | " を削除
+  title = title.replace(/^Amazon\s*\|\s*/i, "");
+
+  // 2. Amazon.co.jp: の削除（既存仕様）
+  title = title.replace(/^Amazon\.co\.jp:\s*/i, "");
+
+  // 3. " | " で分割
+  let parts = title.split("|").map(s => s.trim());
+
+  let product = parts[0] || "";   // 商品名
+  let maker   = parts[1] || "";   // メーカー名
+  // parts[2] 以降はカテゴリ名 → 常に削除
+
+  // 4. メーカー名が商品名に含まれている場合 → メーカー名を削除
+  if (maker && product.includes(maker)) {
+    return product;
   }
 
+  // 5. メーカー名が商品名に含まれていない場合 → メーカー名＋商品名
+  if (maker) {
+    return maker + " " + product;
+  }
+
+  // 6. メーカー名が存在しない場合 → 商品名のみ
+  return product;
+}
+  
   function generateAmazonLink(url){
     if(!url.includes("amazon.co.jp")) return null;
     let asin=null;
