@@ -1,25 +1,25 @@
 {
   "name": "マルチSNS投稿ハブ",
   "short_name": "投稿ハブ",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/app/",
+  "scope": "/app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/app/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/app/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
   "share_target": {
-    "action": "/",
+    "action": "/app/",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
