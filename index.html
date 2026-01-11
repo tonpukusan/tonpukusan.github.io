@@ -287,33 +287,41 @@ button{
   window.addEventListener("beforeunload",closeAll);
 
 })();
-// スマホ判定
-const isMobile = /iPhone|Android.+Mobile/.test(navigator.userAgent);
-if (isMobile) {
+
+// --- スマホ対応（Android向け readText 成功率最大化） ---
+const ua = navigator.userAgent;
+const isAndroid = /Android/.test(ua);
+const isIOS = /iPhone|iPad/.test(ua);
+
+// Android のみ readClipboard ボタンを表示
+if (isAndroid) {
   document.getElementById("readClipboard").style.display = "block";
 }
-document.getElementById("readClipboard").onclick = async () => {
-  try {
-    const clip = await navigator.clipboard.readText();
-    processSharedText(clip);
-  } catch (e) {
-    alert("クリップボードの読み取りが許可されていません");
-  }
-};
+
+// readClipboard ボタン押下 → 同期チェーンで readText()
+document.getElementById("readClipboard").addEventListener("click", () => {
+  navigator.clipboard.readText()
+    .then(text => {
+      processSharedText(text);
+    })
+    .catch(err => {
+      alert("クリップボードの読み取りが許可されていません");
+    });
+});
+
+// 共有テキスト解析ロジック
 function processSharedText(text){
   if(!text) return;
 
-  // URL抽出
   const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
   if(!url){
     alert("URLが見つかりませんでした");
     return;
   }
 
-  // タイトル抽出（1行目）
   const firstLine = text.split("\n")[0].trim();
 
-  // Amazon（短縮URLはそのまま）
+  // Amazon（短縮URL）
   if(url.includes("amzn.to") || url.includes("amzn.asia")){
     textarea.value = "#密林偵察 #Amazonセール情報 #AD\n" + firstLine + "\n" + url;
     return;
@@ -345,6 +353,7 @@ function processSharedText(text){
   // その他
   textarea.value = firstLine + "\n" + url;
 }
+  
 </script>
 
 </body>
