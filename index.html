@@ -286,9 +286,7 @@ button{
   };
   window.addEventListener("beforeunload",closeAll);
 
-})();
-
-// --- スマホ対応（Android向け readText 成功率最大化） ---
+  // --- スマホ対応（Android向け readText 成功率最大化） ---
 const ua = navigator.userAgent;
 const isAndroid = /Android/.test(ua);
 const isIOS = /iPhone|iPad/.test(ua);
@@ -353,6 +351,9 @@ function processSharedText(text){
   // その他
   textarea.value = firstLine + "\n" + url;
 }
+
+  
+})();
   
 </script>
 
