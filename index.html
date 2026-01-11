@@ -46,6 +46,7 @@ button{
 }
 </style>
 </head>
+
 <body>
 <div class="container">
   <h2>マルチSNS投稿ハブ</h2>
@@ -56,7 +57,9 @@ button{
   </div>
 
   <input type="text" id="urlInput" placeholder="スマホではここに商品URLが自動入力されます（Amazon / Rakuten / Yahoo）">
+
   <button id="readClipboard" style="display:none;">クリップボードから読み込む</button>
+
   <button id="generate">投稿文を生成</button>
 
   <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
@@ -79,8 +82,10 @@ button{
   const textarea=document.getElementById("text");
   const urlInput=document.getElementById("urlInput");
 
+  /* -----------------------------
+     URLパラメータ（PCブックマークレット用）
+  ----------------------------- */
   const params=new URLSearchParams(location.search);
-
   const textParam=params.get("text")||"";
   const sharedUrl=params.get("url")||"";
   const sharedText=params.get("text")||"";
@@ -102,44 +107,37 @@ button{
     urlInput.value=sharedUrl;
   }
 
-
-
-
+  /* -----------------------------
+     Amazonタイトル整形（カテゴリ完全除去）
+  ----------------------------- */
   function cleanAmazonTitle(title){
     if(!title) return "";
-  
-    // 1. 先頭の "Amazon | " を削除
+
     title = title.replace(/^Amazon\s*\|\s*/i, "");
-  
-    // 2. Amazon.co.jp: の削除
     title = title.replace(/^Amazon\.co\.jp:\s*/i, "");
-  
-    // 3. コロン区切りのカテゴリ（例: "商品名 : スポーツ＆アウトドア"）を削除
-    //    ただし「商品名 : サブタイトル」のようなケースもあるため、
-    //    Amazonカテゴリに特有の語彙を検出して削除する
-    title = title.replace(/\s*:\s*(スポーツ＆アウトドア|家電＆カメラ|ホーム＆キッチン|服＆ファッション小物|シューズ＆バッグ|おもちゃ|その他.*)$/i, "");
-  
-    // 4. パイプ区切りで分割
+
+    // コロン区切りカテゴリを完全除去
+    title = title.replace(/\s*:\s*[^:]+$/i, "");
+
     let parts = title.split("|").map(s => s.trim());
-  
-    let product = parts[0] || "";   // 商品名
-    let maker   = parts[1] || "";   // メーカー名
-  
-    // 5. メーカー名が商品名に含まれている場合 → メーカー名削除
+    let product = parts[0] || "";
+    let maker   = parts[1] || "";
+
     if (maker && product.includes(maker)) {
       return product;
     }
-  
-    // 6. メーカー名が商品名に含まれていない場合 → メーカー名＋商品名
     if (maker) {
       return maker + " " + product;
     }
-  
     return product;
   }
-  
+
+  /* -----------------------------
+     アフィリンク生成
+  ----------------------------- */
   function generateAmazonLink(url){
     if(!url.includes("amazon.co.jp")) return null;
+
     let asin=null;
     let m1=url.match(/\/dp\/([A-Z0-9]{10})/i);
     let m2=url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
@@ -171,6 +169,9 @@ button{
     return null;
   }
 
+  /* -----------------------------
+     PC版：URL＋タイトル → 投稿文生成
+  ----------------------------- */
   function generateFromURL(url,rawTitle){
     if(!url) return "";
 
@@ -209,6 +210,9 @@ button{
     }
   }
 
+  /* -----------------------------
+     PC版：投稿文生成ボタン
+  ----------------------------- */
   document.getElementById("generate").onclick=()=>{
     let raw=textarea.value.trim();
     let title="";
@@ -243,6 +247,9 @@ button{
     textarea.value=generateFromURL(url,title);
   };
 
+  /* -----------------------------
+     SNS投稿ボタン
+  ----------------------------- */
   document.getElementById("showSNS").onclick=async()=>{
     try{
       await navigator.clipboard.writeText(textarea.value);
@@ -286,75 +293,83 @@ button{
   };
   window.addEventListener("beforeunload",closeAll);
 
-  // --- スマホ対応（Android向け readText 成功率最大化） ---
-const ua = navigator.userAgent;
-const isAndroid = /Android/.test(ua);
-const isIOS = /iPhone|iPad/.test(ua);
+  /* -----------------------------
+     スマホ対応（Android向け readText 成功率最大化）
+  ----------------------------- */
+  const ua = navigator.userAgent;
+  const isAndroid = /Android/.test(ua);
 
-// Android のみ readClipboard ボタンを表示
-if (isAndroid) {
-  document.getElementById("readClipboard").style.display = "block";
-}
-
-// readClipboard ボタン押下 → 同期チェーンで readText()
-document.getElementById("readClipboard").addEventListener("click", () => {
-  navigator.clipboard.readText()
-    .then(text => {
-      processSharedText(text);
-    })
-    .catch(err => {
-      alert("クリップボードの読み取りが許可されていません");
-    });
-});
-
-// 共有テキスト解析ロジック
-function processSharedText(text){
-  if(!text) return;
-
-  const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-  if(!url){
-    alert("URLが見つかりませんでした");
-    return;
+  if (isAndroid) {
+    document.getElementById("readClipboard").style.display = "block";
   }
 
-  const firstLine = text.split("\n")[0].trim();
+  document.getElementById("readClipboard").addEventListener("click", () => {
+    navigator.clipboard.readText()
+      .then(text => {
+        processSharedText(text);
+      })
+      .catch(err => {
+        alert("クリップボードの読み取りが許可されていません");
+      });
+  });
 
-  // Amazon（短縮URL）
-  if(url.includes("amzn.to") || url.includes("amzn.asia")){
-    textarea.value = "#密林偵察 #Amazonセール情報 #AD\n" + firstLine + "\n" + url;
-    return;
+  function processSharedText(text){
+    if(!text) return;
+
+    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+    if(!url){
+      alert("URLが見つかりませんでした");
+      return;
+    }
+
+    const firstLine = text.split("\n")[0].trim();
+
+    // Amazon短縮URL（1行で扱う）
+    if(url.includes("amzn.to") || url.includes("amzn.asia")){
+      textarea.value =
+        "#密林偵察 #Amazonセール情報 #AD\n" +
+        firstLine + "\n" +
+        url.trim();
+      return;
+    }
+
+    // Amazon商品ページURL
+    if(url.includes("amazon.co.jp")){
+      const clean = cleanAmazonTitle(firstLine);
+      const aff = generateAmazonLink(url);
+      textarea.value =
+        "#密林偵察 #Amazonセール情報 #AD\n" +
+        clean + "\n" +
+        aff;
+      return;
+    }
+
+    // 楽天
+    if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
+      const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
+      const aff = generateRakutenLink(url);
+      textarea.value =
+        "#楽天偵察 #セール情報 #AD\n" +
+        cleanTitle + "\n" +
+        aff;
+      return;
+    }
+
+    // Yahoo
+    if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
+      const aff = generateYahooLink(url);
+      textarea.value =
+        "#Yahoo偵察 #AD\n" +
+        firstLine + "\n" +
+        aff;
+      return;
+    }
+
+    // その他
+    textarea.value = firstLine + "\n" + url;
   }
 
-  // Amazon（商品ページURL）
-  if(url.includes("amazon.co.jp")){
-    const clean = cleanAmazonTitle(firstLine);
-    const aff = generateAmazonLink(url);
-    textarea.value = "#密林偵察 #Amazonセール情報 #AD\n" + clean + "\n" + aff;
-    return;
-  }
-
-  // 楽天
-  if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
-    const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
-    const aff = generateRakutenLink(url);
-    textarea.value = "#楽天偵察 #セール情報 #AD\n" + cleanTitle + "\n" + aff;
-    return;
-  }
-
-  // Yahoo
-  if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
-    const aff = generateYahooLink(url);
-    textarea.value = "#Yahoo偵察 #AD\n" + firstLine + "\n" + aff;
-    return;
-  }
-
-  // その他
-  textarea.value = firstLine + "\n" + url;
-}
-
-  
 })();
-  
 </script>
 
 </body>
