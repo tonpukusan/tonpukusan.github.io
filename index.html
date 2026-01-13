@@ -313,64 +313,67 @@ button{
       });
   });
 
-  function processSharedText(text){
-    if(!text) return;
+function processSharedText(text){
+  if(!text) return;
 
-    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-    if(!url){
-      alert("URLが見つかりませんでした");
-      return;
-    }
-
-    let firstLine = text.split("\n")[0].trim();
-    // 1行目に混入している URL を完全除去
-    firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
-    
-    // Amazon短縮URL（1行で扱う）
-    if(url.includes("amzn.to") || url.includes("amzn.asia")){
-      textarea.value =
-        "#密林偵察 #Amazonセール情報 #AD\n" +
-        firstLine + "\n" +
-        url.trim();
-      return;
-    }
-
-    // Amazon商品ページURL
-    if(url.includes("amazon.co.jp")){
-      const clean = cleanAmazonTitle(firstLine);
-      const aff = generateAmazonLink(url);
-      textarea.value =
-        "#密林偵察 #Amazonセール情報 #AD\n" +
-        clean + "\n" +
-        aff;
-      return;
-    }
-
-    // 楽天
-    if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
-      const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
-      const aff = generateRakutenLink(url);
-      textarea.value =
-        "#楽天偵察 #セール情報 #AD\n" +
-        cleanTitle + "\n" +
-        aff;
-      return;
-    }
-
-    // Yahoo
-    if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
-      const aff = generateYahooLink(url);
-      textarea.value =
-        "#Yahoo偵察 #AD\n" +
-        firstLine + "\n" +
-        aff;
-      return;
-    }
-
-    // その他
-    textarea.value = firstLine + "\n" + url;
+  // 共有テキストから最初に見つかった URL を抽出
+  const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+  if(!url){
+    alert("URLが見つかりませんでした");
+    return;
   }
 
+  // 1行目を取得
+  let firstLine = text.split("\n")[0].trim();
+
+  // ★ 1行目に混入している URL を完全除去（①の修正ポイント）
+  firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+  // Amazon短縮URL（1行で扱う）
+  if(url.includes("amzn.to") || url.includes("amzn.asia")){
+    textarea.value =
+      "#密林偵察 #Amazonセール情報 #AD\n" +
+      firstLine + "\n" +
+      url.trim();
+    return;
+  }
+
+  // Amazon商品ページURL
+  if(url.includes("amazon.co.jp")){
+    const clean = cleanAmazonTitle(firstLine);
+    const aff = generateAmazonLink(url);
+    textarea.value =
+      "#密林偵察 #Amazonセール情報 #AD\n" +
+      clean + "\n" +
+      aff;
+    return;
+  }
+
+  // 楽天
+  if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
+    const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
+    const aff = generateRakutenLink(url);
+    textarea.value =
+      "#楽天偵察 #セール情報 #AD\n" +
+      cleanTitle + "\n" +
+      aff;
+    return;
+  }
+
+  // Yahoo
+  if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
+    const aff = generateYahooLink(url);
+    textarea.value =
+      "#Yahoo偵察 #AD\n" +
+      firstLine + "\n" +
+      aff;
+    return;
+  }
+
+  // その他
+  textarea.value = firstLine + "\n" + url;
+}
+  
 })();
 </script>
 
