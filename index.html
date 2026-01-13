@@ -322,8 +322,10 @@ button{
       return;
     }
 
-    const firstLine = text.split("\n")[0].trim();
-
+    let firstLine = text.split("\n")[0].trim();
+    // 1行目に混入している URL を完全除去
+    firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
+    
     // Amazon短縮URL（1行で扱う）
     if(url.includes("amzn.to") || url.includes("amzn.asia")){
       textarea.value =
