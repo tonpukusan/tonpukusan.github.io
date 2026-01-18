@@ -1,4 +1,4 @@
-.yusa-blogcard {
+.ton3-blogcard {
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
@@ -6,46 +6,46 @@
   background: #fff;
 }
 
-.yusa-blogcard-link {
+.ton3-blogcard-link {
   display: flex;
   text-decoration: none;
   color: inherit;
 }
 
-.yusa-blogcard-thumb img {
+.ton3-blogcard-thumb img {
   width: 120px;
   height: 120px;
   object-fit: cover;
 }
 
-.yusa-blogcard-content {
+.ton3-blogcard-content {
   padding: 12px;
   flex: 1;
 }
 
-.yusa-blogcard-title {
+.ton3-blogcard-title {
   font-size: 1rem;
   margin: 0 0 6px;
   font-weight: bold;
 }
 
-.yusa-blogcard-desc {
+.ton3-blogcard-desc {
   font-size: 0.85rem;
   color: #555;
   margin: 0 0 8px;
   line-height: 1.4;
 }
 
-.yusa-blogcard-date {
+.ton3-blogcard-date {
   font-size: 0.75rem;
   color: #888;
 }
 
 @media (max-width: 600px) {
-  .yusa-blogcard-link {
+  .ton3-blogcard-link {
     flex-direction: column;
   }
-  .yusa-blogcard-thumb img {
+  .ton3-blogcard-thumb img {
     width: 100%;
     height: auto;
   }
