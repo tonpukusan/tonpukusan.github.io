@@ -1,6 +1,6 @@
 // ===============================
 //  Small-Fishing Blog Card Generator
-//  Version 1.0
+//  Version 1.1 (Enhanced)
 // ===============================
 
 // Utility: escape HTML
@@ -15,13 +15,12 @@ function escapeHTML(str) {
 
 // Fetch Blogger JSON Feed for a given URL
 async function fetchBloggerData(postUrl) {
-  const feedUrl = postUrl.replace(/\/$/, "") + "?alt=json";
+  const feedUrl = postUrl.replace(/\/$/, "") + "/?alt=json";
 
   try {
     const res = await fetch(feedUrl);
     if (!res.ok) throw new Error("Feed fetch failed");
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (e) {
     console.error("BlogCard Fetch Error:", e);
     return null;
@@ -56,19 +55,22 @@ async function initton3Cards() {
 
     const data = await fetchBloggerData(url);
     if (!data || !data.entry) {
-      card.innerHTML = "<p>カードを読み込めませんでした。</p>";
+      card.innerHTML = "<div class='ton3-blogcard-error'>カードを読み込めませんでした。</div>";
       continue;
     }
 
     const entry = data.entry;
 
     const title = entry.title?.$t || "タイトルなし";
+
     const summaryRaw = entry.summary?.$t || "";
-    const summary = summaryRaw.substring(0, 120) + "…";
+    const summaryText = summaryRaw.replace(/<[^>]+>/g, "");
+    const summary = summaryText.substring(0, 120) + "…";
 
     const thumbnail =
-      entry["media$thumbnail"]?.url ||
-      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg";
+      (entry["media$thumbnail"]?.url || 
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg")
+      .replace(/s\d+-c/, "s320");
 
     const date = entry.published?.$t?.substring(0, 10) || "";
 
@@ -82,5 +84,4 @@ async function initton3Cards() {
   }
 }
 
-// Run after DOM ready
 document.addEventListener("DOMContentLoaded", initton3Cards);
