@@ -1,6 +1,6 @@
 // ===============================
-//  Small-Fishing Blog Card Generator
-//  Version 1.1 (Enhanced)
+//  ton3 Blog Card Generator
+//  Version 2.0 (Blogger spec compliant)
 // ===============================
 
 // Utility: escape HTML
@@ -13,14 +13,20 @@ function escapeHTML(str) {
     .replace(/'/g, "&#39;");
 }
 
-// Fetch Blogger JSON Feed for a given URL
+// Fetch Blogger JSON Feed for a given URL (Blogger official spec)
 async function fetchBloggerData(postUrl) {
-  const feedUrl = postUrl.replace(/\/$/, "") + "/?alt=json";
-
   try {
+    const u = new URL(postUrl);
+
+    // Blogger official single-post JSON endpoint
+    const feedUrl =
+      `${u.origin}/feeds/posts/default?alt=json&path=${encodeURIComponent(u.pathname)}`;
+
     const res = await fetch(feedUrl);
     if (!res.ok) throw new Error("Feed fetch failed");
-    return await res.json();
+
+    const data = await res.json();
+    return data;
   } catch (e) {
     console.error("BlogCard Fetch Error:", e);
     return null;
@@ -54,34 +60,11 @@ async function initton3Cards() {
     if (!url) continue;
 
     const data = await fetchBloggerData(url);
-    if (!data || !data.entry) {
-      card.innerHTML = "<div class='ton3-blogcard-error'>カードを読み込めませんでした。</div>";
+
+    // Blogger spec: entry is inside feed.entry[0]
+    if (!data || !data.feed || !data.feed.entry || !data.feed.entry.length) {
+      card.innerHTML = "<p>カードを読み込めませんでした。</p>";
       continue;
     }
 
-    const entry = data.entry;
-
-    const title = entry.title?.$t || "タイトルなし";
-
-    const summaryRaw = entry.summary?.$t || "";
-    const summaryText = summaryRaw.replace(/<[^>]+>/g, "");
-    const summary = summaryText.substring(0, 120) + "…";
-
-    const thumbnail =
-      (entry["media$thumbnail"]?.url || 
-      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg")
-      .replace(/s\d+-c/, "s320");
-
-    const date = entry.published?.$t?.substring(0, 10) || "";
-
-    card.innerHTML = generateCardHTML({
-      title,
-      url,
-      thumbnail,
-      summary,
-      date,
-    });
-  }
-}
-
-document.addEventListener("DOMContentLoaded", initton3Cards);
+    const entry = data.feed.entry
