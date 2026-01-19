@@ -67,4 +67,30 @@ async function initton3Cards() {
       continue;
     }
 
-    const entry = data.feed.entry
+    const entry = data.feed.entry[0];
+
+    const title = entry.title?.$t || "タイトルなし";
+
+    const summaryRaw = entry.summary?.$t || "";
+    const summaryText = summaryRaw.replace(/<[^>]+>/g, "");
+    const summary = summaryText.substring(0, 120) + "…";
+
+    const thumbnail =
+      (entry["media$thumbnail"]?.url ||
+        "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg"
+      ).replace(/s\d+-c/, "s320");
+
+    const date = entry.published?.$t?.substring(0, 10) || "";
+
+    card.innerHTML = generateCardHTML({
+      title,
+      url,
+      thumbnail,
+      summary,
+      date,
+    });
+  }
+}
+
+// Run after DOM ready
+document.addEventListener("DOMContentLoaded", initton3Cards);
