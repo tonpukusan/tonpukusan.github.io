@@ -9,16 +9,19 @@ function escapeHTML(str) {
 
 async function fetchBloggerData(postUrl) {
   try {
-    var u = new URL(postUrl);
-    var feedUrl =
-      u.origin +
-      "/feeds/posts/default?alt=json&path=" +
-      encodeURIComponent(u.pathname);
+    const u = new URL(postUrl);
+    const origin = u.origin;
+    const pathname = u.pathname;
 
-    var res = await fetch(feedUrl);
+    const proxy = "https://silent-resonance-1dba.tonpukusan.workers.dev/?url=";
+    const feedUrl = proxy + encodeURIComponent(
+      origin + "/feeds/posts/default?alt=json&path=" + encodeURIComponent(pathname)
+    );
+
+    const res = await fetch(feedUrl);
     if (!res.ok) throw new Error("Feed fetch failed");
 
-    var data = await res.json();
+    const data = await res.json();
     return data;
   } catch (e) {
     console.error("BlogCard Fetch Error:", e);
