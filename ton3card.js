@@ -1,9 +1,3 @@
-// ===============================
-//  ton3 Blog Card Generator
-//  Version 2.0 (Blogger spec compliant)
-// ===============================
-
-// Utility: escape HTML
 function escapeHTML(str) {
   return str
     .replace(/&/g, "&amp;")
@@ -13,19 +7,18 @@ function escapeHTML(str) {
     .replace(/'/g, "&#39;");
 }
 
-// Fetch Blogger JSON Feed for a given URL (Blogger official spec)
 async function fetchBloggerData(postUrl) {
   try {
-    const u = new URL(postUrl);
+    var u = new URL(postUrl);
+    var feedUrl =
+      u.origin +
+      "/feeds/posts/default?alt=json&path=" +
+      encodeURIComponent(u.pathname);
 
-    // Blogger official single-post JSON endpoint
-    const feedUrl =
-      `${u.origin}/feeds/posts/default?alt=json&path=${encodeURIComponent(u.pathname)}`;
-
-    const res = await fetch(feedUrl);
+    var res = await fetch(feedUrl);
     if (!res.ok) throw new Error("Feed fetch failed");
 
-    const data = await res.json();
+    var data = await res.json();
     return data;
   } catch (e) {
     console.error("BlogCard Fetch Error:", e);
@@ -33,64 +26,60 @@ async function fetchBloggerData(postUrl) {
   }
 }
 
-// Generate card HTML
-function generateCardHTML({ title, url, thumbnail, summary, date }) {
-  return `
-    <div class="ton3-blogcard">
-      <a href="${url}" class="ton3-blogcard-link" target="_blank" rel="noopener">
-        <div class="ton3-blogcard-thumb">
-          <img src="${thumbnail}" loading="lazy" alt="${escapeHTML(title)}">
-        </div>
-        <div class="ton3-blogcard-content">
-          <h3 class="ton3-blogcard-title">${escapeHTML(title)}</h3>
-          <p class="ton3-blogcard-desc">${escapeHTML(summary)}</p>
-          <span class="ton3-blogcard-date">${escapeHTML(date)}</span>
-        </div>
-      </a>
-    </div>
-  `;
+function generateCardHTML(obj) {
+  var html = "";
+  html += '<div class="ton3-blogcard">';
+  html += '<a href="' + obj.url + '" class="ton3-blogcard-link" target="_blank" rel="noopener">';
+  html += '<div class="ton3-blogcard-thumb">';
+  html += '<img src="' + obj.thumbnail + '" loading="lazy" alt="' + escapeHTML(obj.title) + '">';
+  html += '</div>';
+  html += '<div class="ton3-blogcard-content">';
+  html += '<h3 class="ton3-blogcard-title">' + escapeHTML(obj.title) + '</h3>';
+  html += '<p class="ton3-blogcard-desc">' + escapeHTML(obj.summary) + '</p>';
+  html += '<span class="ton3-blogcard-date">' + escapeHTML(obj.date) + '</span>';
+  html += '</div>';
+  html += '</a>';
+  html += '</div>';
+  return html;
 }
 
-// Main: scan all .ton3-card elements
 async function initton3Cards() {
-  const cards = document.querySelectorAll(".ton3-card");
+  var cards = document.querySelectorAll(".ton3-card");
 
-  for (const card of cards) {
-    const url = card.dataset.url;
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var url = card.dataset.url;
     if (!url) continue;
 
-    const data = await fetchBloggerData(url);
+    var data = await fetchBloggerData(url);
 
-    // Blogger spec: entry is inside feed.entry[0]
     if (!data || !data.feed || !data.feed.entry || !data.feed.entry.length) {
       card.innerHTML = "<p>カードを読み込めませんでした。</p>";
       continue;
     }
 
-    const entry = data.feed.entry[0];
+    var entry = data.feed.entry[0];
 
-    const title = entry.title?.$t || "タイトルなし";
+    var title = entry.title ? entry.title.$t : "タイトルなし";
 
-    const summaryRaw = entry.summary?.$t || "";
-    const summaryText = summaryRaw.replace(/<[^>]+>/g, "");
-    const summary = summaryText.substring(0, 120) + "…";
+    var summaryRaw = entry.summary ? entry.summary.$t : "";
+    var summaryText = summaryRaw.replace(/<[^>]+>/g, "");
+    var summary = summaryText.substring(0, 120) + "…";
 
-    const thumbnail =
-      (entry["media$thumbnail"]?.url ||
-        "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg"
-      ).replace(/s\d+-c/, "s320");
+    var thumbnail = entry["media$thumbnail"]
+      ? entry["media$thumbnail"].url.replace(/s\d+-c/, "s320")
+      : "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHhH_s0EKdgNEbOuz4OIQEEWhdgqbpCBk1tLZjXQrnkFsxaP2F1_P9emqbnprxxBWk-A8rJ_cLfmI1NJrW6FAPYNtkhcegw81vhnsV79e2Sa0vqOe2bwGfjbL-K5EwnE0CWV0iq6N998I/s96/ProfilePhoto.jpg";
 
-    const date = entry.published?.$t?.substring(0, 10) || "";
+    var date = entry.published ? entry.published.$t.substring(0, 10) : "";
 
     card.innerHTML = generateCardHTML({
-      title,
-      url,
-      thumbnail,
-      summary,
-      date,
+      title: title,
+      url: url,
+      thumbnail: thumbnail,
+      summary: summary,
+      date: date
     });
   }
 }
 
-// Run after DOM ready
 document.addEventListener("DOMContentLoaded", initton3Cards);
