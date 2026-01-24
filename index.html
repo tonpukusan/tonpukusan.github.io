@@ -429,11 +429,7 @@ button{
 
     // 楽天
     if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
-      const cleanTitle = firstLine.replace(/^
-
-\[楽天\]
-
-\s*/i, "");
+      const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
       const aff = generateRakutenLink(url);
       textarea.value =
         "#楽天偵察 #セール情報 #AD\n" +
