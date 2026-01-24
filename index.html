@@ -102,6 +102,7 @@ button{
     <button class="sns-btn" id="btnThreads">Threads に投稿</button>
     <button class="sns-btn" id="btnBsky">Bluesky に投稿</button>
     <button class="sns-btn" id="btnFb">Facebook に投稿</button>
+    <button class="sns-btn" id="btnPinterest">Pinterest に投稿</button>
   </div>
 </div>
 <script>
@@ -291,6 +292,47 @@ button{
     if(!files) return;
     for(const file of files) handleImageFile(file);
   });
+
+  /* -----------------------------
+     Pinterest ボタン表示制御
+     - 楽天 → 表示
+     - Blogger → 表示
+     - Amazon → 非表示
+     - Yahoo（VC）→ 非表示
+     - その他 → 非表示
+  ----------------------------- */
+  function updatePinterestButtonVisibility(){
+    const text = textarea.value.trim();
+    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+
+    const btn = document.getElementById("btnPinterest");
+
+    if(!url){
+      btn.style.display = "none";
+      return;
+    }
+
+    const isAmazon = url.includes("amazon.co.jp") || url.includes("amzn.to");
+    const isRakuten = /rakuten\.(co\.jp|ne\.jp)/.test(url);
+    const isYahoo = url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp");
+
+    const isBlogger =
+      url.includes("small-fishing.com") ||
+      url.includes("fishingtonpuku.blogspot.com") ||
+      url.includes("tonpuku3fishing.blogspot.com");
+
+    if(isRakuten || isBlogger){
+      btn.style.display = "block";
+    } else {
+      btn.style.display = "none";
+    }
+  }
+
+  /* 投稿文生成後に Pinterest ボタン表示制御 */
+  document.getElementById("generate").addEventListener("click", updatePinterestButtonVisibility);
+  textarea.addEventListener("input", updatePinterestButtonVisibility);
+
+
   /* -----------------------------
      Android向け readText
   ----------------------------- */
@@ -420,6 +462,23 @@ button{
   document.getElementById("btnFb").onclick = () => {
     if (winFb && !winFb.closed) winFb.close();
     winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
+  };
+
+  /* -----------------------------
+     Pinterest（楽天 or Blogger のみ）
+  ----------------------------- */
+  document.getElementById("btnPinterest").onclick = () => {
+    const text = textarea.value.trim();
+    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+
+    if(!url) return;
+
+    const pinterestUrl =
+      "https://www.pinterest.com/pin-builder/?" +
+      "url=" + encodeURIComponent(url) +
+      "&description=" + encodeURIComponent(text);
+
+    window.open(pinterestUrl, "SNS_PINTEREST");
   };
 
   /* -----------------------------
