@@ -1,112 +1,7 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>マルチSNS投稿ハブ（Amazon/Rakuten/Yahoo対応版＋画像ペースト）</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{
-  font-family:system-ui,sans-serif;
-  margin:0;
-  padding:20px;
-  background:#fff;
-}
-.container{
-  max-width:600px;
-  margin:auto;
-}
-textarea,input[type="text"]{
-  width:100%;
-  padding:10px;
-  font-size:1rem;
-  margin-bottom:10px;
-}
-textarea{
-  height:150px;
-}
-button{
-  padding:12px 16px;
-  margin:6px 0;
-  font-size:1.1rem;
-  cursor:pointer;
-  width:100%;
-}
-#snsButtons{
-  margin-top:20px;
-  display:none;
-}
-.sns-btn{
-  margin-bottom:10px;
-}
-.note{
-  font-size:.85rem;
-  color:#555;
-  margin-bottom:8px;
-}
-.image-note{
-  font-size:.85rem;
-  color:#555;
-  margin:8px 0 4px;
-}
-.image-box{
-  border:1px solid #ccc;
-  border-radius:4px;
-  padding:10px;
-  min-height:80px;
-  font-size:.9rem;
-  color:#555;
-  background:#fafafa;
-  overflow:auto;
-}
-.image-box img{
-  max-width:100%;
-  height:auto;
-  display:block;
-  margin-bottom:6px;
-}
-</style>
-</head>
-
-<body>
-<div class="container">
-  <h2>マルチSNS投稿ハブ</h2>
-
-  <div class="note">
-    PC：ブックマークレットから開くとタイトル＋URLが自動で入ります。<br>
-    Android：共有メニューから「投稿ハブ」を選ぶとURLが自動入力されます。
-  </div>
-
-  <input type="text" id="urlInput" placeholder="スマホではここに商品URLが自動入力されます（Amazon / Rakuten / Yahoo）">
-
-  <button id="readClipboard" style="display:none;">クリップボードから読み込む</button>
-
-  <button id="generate">投稿文を生成</button>
-
-  <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
-
-  <div class="image-note">
-    検索結果やキャンペーン画面のスクショなど、アイキャッチにしたい画像をここにペースト（Ctrl+V）またはドラッグ＆ドロップしてください。<br>
-    各SNSの投稿画面が開いたら、本文をペーストした後に画像も Ctrl+V で貼り付けてください。
-  </div>
-  <div id="imageBox" class="image-box">
-    ここに画像をペースト（Ctrl+V）またはドラッグ＆ドロップ
-  </div>
-
-  <button id="showSNS">投稿</button>
-  <button id="closeAll" style="background:#ff4d4d;color:#fff;">すべて閉じる</button>
-
-  <div id="snsButtons">
-    <button class="sns-btn" id="btnX">X に投稿</button>
-    <button class="sns-btn" id="btnThreads">Threads に投稿</button>
-    <button class="sns-btn" id="btnBsky">Bluesky に投稿</button>
-    <button class="sns-btn" id="btnFb">Facebook に投稿</button>
-  </div>
-</div>
-
 <script>
 (function(){
 
-  let winX=null,winThreads=null,winBsky=null,winFb=null;
+  let winX=null, winThreads=null, winBsky=null, winFb=null;
   const textarea=document.getElementById("text");
   const urlInput=document.getElementById("urlInput");
   const imageBox=document.getElementById("imageBox");
@@ -137,27 +32,21 @@ button{
   }
 
   /* -----------------------------
-     Amazonタイトル整形（カテゴリ完全除去）
+     Amazonタイトル整形
   ----------------------------- */
   function cleanAmazonTitle(title){
     if(!title) return "";
 
     title = title.replace(/^Amazon\s*\|\s*/i, "");
     title = title.replace(/^Amazon\.co\.jp:\s*/i, "");
-
-    // コロン区切りカテゴリを完全除去
     title = title.replace(/\s*:\s*[^:]+$/i, "");
 
     let parts = title.split("|").map(s => s.trim());
     let product = parts[0] || "";
     let maker   = parts[1] || "";
 
-    if (maker && product.includes(maker)) {
-      return product;
-    }
-    if (maker) {
-      return maker + " " + product;
-    }
+    if (maker && product.includes(maker)) return product;
+    if (maker) return maker + " " + product;
     return product;
   }
 
@@ -199,7 +88,7 @@ button{
   }
 
   /* -----------------------------
-     PC版：URL＋タイトル → 投稿文生成
+     URL＋タイトル → 投稿文生成
   ----------------------------- */
   function generateFromURL(url,rawTitle){
     if(!url) return "";
@@ -207,45 +96,34 @@ button{
     let amazon=generateAmazonLink(url);
     if(amazon){
       let title=cleanAmazonTitle(rawTitle);
-      if(title){
-        return "#密林偵察 #Amazonセール情報 #AD\n"+title+"\n"+amazon;
-      }else{
-        return "#密林偵察 #Amazonセール情報 #AD\n"+amazon;
-      }
+      return "#密林偵察 #Amazonセール情報 #AD\n" +
+             (title ? title+"\n" : "") +
+             amazon;
     }
 
     let rakuten=generateRakutenLink(url);
     if(rakuten){
-      if(rawTitle){
-        return "#楽天偵察 #セール情報 #AD\n"+rawTitle+"\n"+rakuten;
-      }else{
-        return "#楽天偵察 #セール情報 #AD\n"+rakuten;
-      }
+      return "#楽天偵察 #セール情報 #AD\n" +
+             (rawTitle ? rawTitle+"\n" : "") +
+             rakuten;
     }
 
     let yahoo=generateYahooLink(url);
     if(yahoo){
-      if(rawTitle){
-        return "#Yahoo偵察 #AD\n"+rawTitle+"\n"+yahoo;
-      }else{
-        return "#Yahoo偵察 #AD\n"+yahoo;
-      }
+      return "#Yahoo偵察 #AD\n" +
+             (rawTitle ? rawTitle+"\n" : "") +
+             yahoo;
     }
 
-    if(rawTitle){
-      return rawTitle+"\n"+url;
-    }else{
-      return url;
-    }
+    return rawTitle ? rawTitle+"\n"+url : url;
   }
 
   /* -----------------------------
-     PC版：投稿文生成ボタン
+     投稿文生成ボタン
   ----------------------------- */
   document.getElementById("generate").onclick=()=>{
     let raw=textarea.value.trim();
-    let title="";
-    let url="";
+    let title="", url="";
 
     if(raw){
       let lines=raw.split("\n");
@@ -255,13 +133,8 @@ button{
       }
     }
 
-    if(!url){
-      url=urlInput.value.trim();
-    }
-
-    if(!url){
-      return;
-    }
+    if(!url) url=urlInput.value.trim();
+    if(!url) return;
 
     if(generateYahooLink(url)){
       document.getElementById("btnThreads").style.display="none";
@@ -280,41 +153,51 @@ button{
      SNS投稿ボタン
   ----------------------------- */
   document.getElementById("showSNS").onclick=async()=>{
-    try{
-      await navigator.clipboard.writeText(textarea.value);
-    }catch(e){}
+    try{ await navigator.clipboard.writeText(textarea.value); }catch(e){}
     document.getElementById("snsButtons").style.display="block";
   };
 
+  /* ---- X（再利用可能） ---- */
   document.getElementById("btnX").onclick=()=>{
-    winX=window.open(
-      "https://twitter.com/intent/tweet?text="+encodeURIComponent(textarea.value),
-      "SNS_X"
-    );
+    const url="https://twitter.com/intent/tweet?text="+encodeURIComponent(textarea.value);
+
+    if(!winX || winX.closed){
+      winX = window.open(url, "SNS_X");
+    }else{
+      winX.location.href = url;
+      winX.focus();
+    }
     if(winX) winX.opener=null;
   };
 
+  /* ---- Threads（opener切断 → 再利用不可 → 毎回閉じて開く） ---- */
   document.getElementById("btnThreads").onclick=()=>{
-    winThreads=window.open(
-      "https://www.threads.net/intent/post",
-      "SNS_THREADS"
-    );
+    if(winThreads && !winThreads.closed) winThreads.close();
+    winThreads = window.open("https://www.threads.net/intent/post", "SNS_THREADS");
     if(winThreads) winThreads.opener=null;
   };
 
+  /* ---- Bluesky（再利用可能） ---- */
   document.getElementById("btnBsky").onclick=()=>{
-    winBsky=window.open("https://bsky.app","SNS_BSKY");
+    const url="https://bsky.app";
+
+    if(!winBsky || winBsky.closed){
+      winBsky = window.open(url, "SNS_BSKY");
+    }else{
+      winBsky.location.href = url;
+      winBsky.focus();
+    }
     if(winBsky) winBsky.opener=null;
   };
 
+  /* ---- Facebook（opener切断 → 再利用不可 → 毎回閉じて開く） ---- */
   document.getElementById("btnFb").onclick=()=>{
-    winFb=window.open(
-      "https://www.facebook.com/home.php",
-      "SNS_FB"
-    );
+    if(winFb && !winFb.closed) winFb.close();
+    winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
     if(winFb) winFb.opener=null;
   };
 
+  /* ---- 全SNSタブを閉じる ---- */
   function closeAll(){
     [winX,winThreads,winBsky,winFb].forEach(w=>{
       if(w && !w.closed) w.close();
@@ -327,13 +210,12 @@ button{
   window.addEventListener("beforeunload",closeAll);
 
   /* -----------------------------
-     画像ペースト／ドラッグ＆ドロップ対応
+     画像ペースト／ドラッグ＆ドロップ
   ----------------------------- */
   function handleImageFile(file){
     if(!file || !file.type.startsWith("image/")) return;
     const reader=new FileReader();
     reader.onload=()=>{
-      // 初回ペースト時の説明文を消す
       if(imageBox.textContent.trim().startsWith("ここに画像をペースト")){
         imageBox.textContent="";
       }
@@ -349,30 +231,23 @@ button{
     if(!items) return;
     for(const item of items){
       if(item.type && item.type.startsWith("image/")){
-        const file=item.getAsFile();
-        handleImageFile(file);
+        handleImageFile(item.getAsFile());
         e.preventDefault();
         return;
       }
     }
-    // 画像以外はそのまま（テキストは貼らない方が安全なら prevent してもよい）
   });
 
-  imageBox.addEventListener("dragover",e=>{
-    e.preventDefault();
-  });
-
+  imageBox.addEventListener("dragover",e=>e.preventDefault());
   imageBox.addEventListener("drop",e=>{
     e.preventDefault();
     const files=e.dataTransfer && e.dataTransfer.files;
-    if(!files || !files.length) return;
-    for(const file of files){
-      handleImageFile(file);
-    }
+    if(!files) return;
+    for(const file of files) handleImageFile(file);
   });
 
   /* -----------------------------
-     スマホ対応（Android向け readText 成功率最大化）
+     Android向け readText
   ----------------------------- */
   const ua = navigator.userAgent;
   const isAndroid = /Android/.test(ua);
@@ -383,31 +258,22 @@ button{
 
   document.getElementById("readClipboard").addEventListener("click", () => {
     navigator.clipboard.readText()
-      .then(text => {
-        processSharedText(text);
-      })
-      .catch(err => {
-        alert("クリップボードの読み取りが許可されていません");
-      });
+      .then(text => processSharedText(text))
+      .catch(() => alert("クリップボードの読み取りが許可されていません"));
   });
 
   function processSharedText(text){
     if(!text) return;
 
-    // 共有テキストから最初に見つかった URL を抽出
     const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
     if(!url){
       alert("URLが見つかりませんでした");
       return;
     }
 
-    // 1行目を取得
     let firstLine = text.split("\n")[0].trim();
-
-    // 1行目に混入している URL を完全除去
     firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
 
-    // Amazon短縮URL
     if(url.includes("amzn.to") || url.includes("amzn.asia")){
       textarea.value =
         "#密林偵察 #Amazonセール情報 #AD\n" +
@@ -416,7 +282,6 @@ button{
       return;
     }
 
-    // Amazon商品ページURL
     if(url.includes("amazon.co.jp")){
       const clean = cleanAmazonTitle(firstLine);
       const aff = generateAmazonLink(url);
@@ -427,7 +292,6 @@ button{
       return;
     }
 
-    // 楽天
     if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
       const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
       const aff = generateRakutenLink(url);
@@ -438,7 +302,6 @@ button{
       return;
     }
 
-    // Yahoo
     if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
       const aff = generateYahooLink(url);
       textarea.value =
@@ -448,12 +311,8 @@ button{
       return;
     }
 
-    // その他
     textarea.value = firstLine + "\n" + url;
   }
 
 })();
 </script>
-
-</body>
-</html>
