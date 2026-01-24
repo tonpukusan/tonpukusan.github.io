@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>マルチSNS投稿ハブ（Amazon/Rakuten/Yahoo対応版）</title>
+<title>マルチSNS投稿ハブ（Amazon/Rakuten/Yahoo対応版＋画像ペースト）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -44,6 +44,27 @@ button{
   color:#555;
   margin-bottom:8px;
 }
+.image-note{
+  font-size:.85rem;
+  color:#555;
+  margin:8px 0 4px;
+}
+.image-box{
+  border:1px solid #ccc;
+  border-radius:4px;
+  padding:10px;
+  min-height:80px;
+  font-size:.9rem;
+  color:#555;
+  background:#fafafa;
+  overflow:auto;
+}
+.image-box img{
+  max-width:100%;
+  height:auto;
+  display:block;
+  margin-bottom:6px;
+}
 </style>
 </head>
 
@@ -64,6 +85,14 @@ button{
 
   <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
 
+  <div class="image-note">
+    検索結果やキャンペーン画面のスクショなど、アイキャッチにしたい画像をここにペースト（Ctrl+V）またはドラッグ＆ドロップしてください。<br>
+    各SNSの投稿画面が開いたら、本文をペーストした後に画像も Ctrl+V で貼り付けてください。
+  </div>
+  <div id="imageBox" class="image-box">
+    ここに画像をペースト（Ctrl+V）またはドラッグ＆ドロップ
+  </div>
+
   <button id="showSNS">投稿</button>
   <button id="closeAll" style="background:#ff4d4d;color:#fff;">すべて閉じる</button>
 
@@ -81,6 +110,7 @@ button{
   let winX=null,winThreads=null,winBsky=null,winFb=null;
   const textarea=document.getElementById("text");
   const urlInput=document.getElementById("urlInput");
+  const imageBox=document.getElementById("imageBox");
 
   /* -----------------------------
      URLパラメータ（PCブックマークレット用）
@@ -262,6 +292,7 @@ button{
       "https://twitter.com/intent/tweet?text="+encodeURIComponent(textarea.value),
       "SNS_X"
     );
+    if(winX) winX.opener=null;
   };
 
   document.getElementById("btnThreads").onclick=()=>{
@@ -269,10 +300,12 @@ button{
       "https://www.threads.net/intent/post",
       "SNS_THREADS"
     );
+    if(winThreads) winThreads.opener=null;
   };
 
   document.getElementById("btnBsky").onclick=()=>{
     winBsky=window.open("https://bsky.app","SNS_BSKY");
+    if(winBsky) winBsky.opener=null;
   };
 
   document.getElementById("btnFb").onclick=()=>{
@@ -280,6 +313,7 @@ button{
       "https://www.facebook.com/home.php",
       "SNS_FB"
     );
+    if(winFb) winFb.opener=null;
   };
 
   function closeAll(){
@@ -292,6 +326,51 @@ button{
     window.close();
   };
   window.addEventListener("beforeunload",closeAll);
+
+  /* -----------------------------
+     画像ペースト／ドラッグ＆ドロップ対応
+  ----------------------------- */
+  function handleImageFile(file){
+    if(!file || !file.type.startsWith("image/")) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      // 初回ペースト時の説明文を消す
+      if(imageBox.textContent.trim().startsWith("ここに画像をペースト")){
+        imageBox.textContent="";
+      }
+      const img=document.createElement("img");
+      img.src=reader.result;
+      imageBox.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  imageBox.addEventListener("paste",e=>{
+    const items=e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(const item of items){
+      if(item.type && item.type.startsWith("image/")){
+        const file=item.getAsFile();
+        handleImageFile(file);
+        e.preventDefault();
+        return;
+      }
+    }
+    // 画像以外はそのまま（テキストは貼らない方が安全なら prevent してもよい）
+  });
+
+  imageBox.addEventListener("dragover",e=>{
+    e.preventDefault();
+  });
+
+  imageBox.addEventListener("drop",e=>{
+    e.preventDefault();
+    const files=e.dataTransfer && e.dataTransfer.files;
+    if(!files || !files.length) return;
+    for(const file of files){
+      handleImageFile(file);
+    }
+  });
 
   /* -----------------------------
      スマホ対応（Android向け readText 成功率最大化）
@@ -313,67 +392,71 @@ button{
       });
   });
 
-function processSharedText(text){
-  if(!text) return;
+  function processSharedText(text){
+    if(!text) return;
 
-  // 共有テキストから最初に見つかった URL を抽出
-  const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-  if(!url){
-    alert("URLが見つかりませんでした");
-    return;
+    // 共有テキストから最初に見つかった URL を抽出
+    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+    if(!url){
+      alert("URLが見つかりませんでした");
+      return;
+    }
+
+    // 1行目を取得
+    let firstLine = text.split("\n")[0].trim();
+
+    // 1行目に混入している URL を完全除去
+    firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+    // Amazon短縮URL
+    if(url.includes("amzn.to") || url.includes("amzn.asia")){
+      textarea.value =
+        "#密林偵察 #Amazonセール情報 #AD\n" +
+        firstLine + "\n" +
+        url.trim();
+      return;
+    }
+
+    // Amazon商品ページURL
+    if(url.includes("amazon.co.jp")){
+      const clean = cleanAmazonTitle(firstLine);
+      const aff = generateAmazonLink(url);
+      textarea.value =
+        "#密林偵察 #Amazonセール情報 #AD\n" +
+        clean + "\n" +
+        aff;
+      return;
+    }
+
+    // 楽天
+    if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
+      const cleanTitle = firstLine.replace(/^
+
+\[楽天\]
+
+\s*/i, "");
+      const aff = generateRakutenLink(url);
+      textarea.value =
+        "#楽天偵察 #セール情報 #AD\n" +
+        cleanTitle + "\n" +
+        aff;
+      return;
+    }
+
+    // Yahoo
+    if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
+      const aff = generateYahooLink(url);
+      textarea.value =
+        "#Yahoo偵察 #AD\n" +
+        firstLine + "\n" +
+        aff;
+      return;
+    }
+
+    // その他
+    textarea.value = firstLine + "\n" + url;
   }
 
-  // 1行目を取得
-  let firstLine = text.split("\n")[0].trim();
-
-  // ★ 1行目に混入している URL を完全除去（①の修正ポイント）
-  firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-  // Amazon短縮URL（1行で扱う）
-  if(url.includes("amzn.to") || url.includes("amzn.asia")){
-    textarea.value =
-      "#密林偵察 #Amazonセール情報 #AD\n" +
-      firstLine + "\n" +
-      url.trim();
-    return;
-  }
-
-  // Amazon商品ページURL
-  if(url.includes("amazon.co.jp")){
-    const clean = cleanAmazonTitle(firstLine);
-    const aff = generateAmazonLink(url);
-    textarea.value =
-      "#密林偵察 #Amazonセール情報 #AD\n" +
-      clean + "\n" +
-      aff;
-    return;
-  }
-
-  // 楽天
-  if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
-    const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
-    const aff = generateRakutenLink(url);
-    textarea.value =
-      "#楽天偵察 #セール情報 #AD\n" +
-      cleanTitle + "\n" +
-      aff;
-    return;
-  }
-
-  // Yahoo
-  if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
-    const aff = generateYahooLink(url);
-    textarea.value =
-      "#Yahoo偵察 #AD\n" +
-      firstLine + "\n" +
-      aff;
-    return;
-  }
-
-  // その他
-  textarea.value = firstLine + "\n" + url;
-}
-  
 })();
 </script>
 
