@@ -104,7 +104,6 @@ button{
     <button class="sns-btn" id="btnFb">Facebook に投稿</button>
   </div>
 </div>
-
 <script>
 (function(){
 
@@ -257,66 +256,6 @@ button{
   };
 
   /* -----------------------------
-     SNS投稿ボタン
-  ----------------------------- */
-  document.getElementById("showSNS").onclick=async()=>{
-    try{ await navigator.clipboard.writeText(textarea.value); }catch(e){}
-    document.getElementById("snsButtons").style.display="block";
-  };
-
-  /* ---- X（再利用可能） ---- */
-  document.getElementById("btnX").onclick=()=>{
-    const url="https://twitter.com/intent/tweet?text="+encodeURIComponent(textarea.value);
-
-    if(!winX || winX.closed){
-      winX = window.open(url, "SNS_X");
-    }else{
-      winX.location.href = url;
-      winX.focus();
-    }
-    if(winX) winX.opener=null;
-  };
-
-  /* ---- Threads（毎回閉じて開く） ---- */
-  document.getElementById("btnThreads").onclick=()=>{
-    if(winThreads && !winThreads.closed) winThreads.close();
-    winThreads = window.open("https://www.threads.net/intent/post", "SNS_THREADS");
-    if(winThreads) winThreads.opener=null;
-  };
-
-  /* ---- Bluesky（再利用可能） ---- */
-  document.getElementById("btnBsky").onclick=()=>{
-    const url="https://bsky.app";
-
-    if(!winBsky || winBsky.closed){
-      winBsky = window.open(url, "SNS_BSKY");
-    }else{
-      winBsky.location.href = url;
-      winBsky.focus();
-    }
-    if(winBsky) winBsky.opener=null;
-  };
-
-  /* ---- Facebook（毎回閉じて開く） ---- */
-  document.getElementById("btnFb").onclick=()=>{
-    if(winFb && !winFb.closed) winFb.close();
-    winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
-    if(winFb) winFb.opener=null;
-  };
-
-  /* ---- 全SNSタブを閉じる ---- */
-  function closeAll(){
-    [winX,winThreads,winBsky,winFb].forEach(w=>{
-      if(w && !w.closed) w.close();
-    });
-  }
-  document.getElementById("closeAll").onclick=()=>{
-    closeAll();
-    window.close();
-  };
-  window.addEventListener("beforeunload",closeAll);
-
-  /* -----------------------------
      画像ペースト／ドラッグ＆ドロップ
   ----------------------------- */
   function handleImageFile(file){
@@ -352,7 +291,6 @@ button{
     if(!files) return;
     for(const file of files) handleImageFile(file);
   });
-
   /* -----------------------------
      Android向け readText
   ----------------------------- */
@@ -420,6 +358,85 @@ button{
 
     textarea.value = firstLine + "\n" + url;
   }
+
+  /* -----------------------------
+     SNS投稿ボタン（async禁止）
+     → ポップアップブロック対策
+  ----------------------------- */
+  document.getElementById("showSNS").onclick = () => {
+    navigator.clipboard.writeText(textarea.value).catch(()=>{});
+    document.getElementById("snsButtons").style.display="block";
+  };
+
+  /* -----------------------------
+     X（再利用可能）
+  ----------------------------- */
+  document.getElementById("btnX").onclick = () => {
+    const url = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(textarea.value);
+
+    if (!winX || winX.closed) {
+      winX = window.open(url, "SNS_X");
+    } else {
+      try {
+        winX.location.href = url;
+        winX.focus();
+      } catch(e) {
+        winX.close();
+        winX = window.open(url, "SNS_X");
+      }
+    }
+  };
+
+  /* -----------------------------
+     Threads（毎回閉じて開く）
+  ----------------------------- */
+  document.getElementById("btnThreads").onclick = () => {
+    if (winThreads && !winThreads.closed) winThreads.close();
+    winThreads = window.open("https://www.threads.net/intent/post", "SNS_THREADS");
+  };
+
+  /* -----------------------------
+     Bluesky（再利用可能）
+  ----------------------------- */
+  document.getElementById("btnBsky").onclick = () => {
+    const url = "https://bsky.app";
+
+    if (!winBsky || winBsky.closed) {
+      winBsky = window.open(url, "SNS_BSKY");
+    } else {
+      try {
+        winBsky.location.href = url;
+        winBsky.focus();
+      } catch(e) {
+        winBsky.close();
+        winBsky = window.open(url, "SNS_BSKY");
+      }
+    }
+  };
+
+  /* -----------------------------
+     Facebook（毎回閉じて開く）
+  ----------------------------- */
+  document.getElementById("btnFb").onclick = () => {
+    if (winFb && !winFb.closed) winFb.close();
+    winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
+  };
+
+  /* -----------------------------
+     全SNSタブを閉じる
+  ----------------------------- */
+  function closeAll(){
+    [winX, winThreads, winBsky, winFb].forEach(w=>{
+      if(w && !w.closed) w.close();
+    });
+  }
+
+  document.getElementById("closeAll").onclick = () => {
+    closeAll();
+    window.close();
+  };
+
+  window.addEventListener("beforeunload", closeAll);
 
 })();
 </script>
