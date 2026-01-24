@@ -1,3 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>マルチSNS投稿ハブ（Amazon/Rakuten/Yahoo対応＋画像ペースト）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  font-family:system-ui,sans-serif;
+  margin:0;
+  padding:20px;
+  background:#fff;
+}
+.container{
+  max-width:600px;
+  margin:auto;
+}
+textarea,input[type="text"]{
+  width:100%;
+  padding:10px;
+  font-size:1rem;
+  margin-bottom:10px;
+}
+textarea{
+  height:150px;
+}
+button{
+  padding:12px 16px;
+  margin:6px 0;
+  font-size:1.1rem;
+  cursor:pointer;
+  width:100%;
+}
+#snsButtons{
+  margin-top:20px;
+  display:none;
+}
+.sns-btn{
+  margin-bottom:10px;
+}
+.note{
+  font-size:.85rem;
+  color:#555;
+  margin-bottom:8px;
+}
+.image-note{
+  font-size:.85rem;
+  color:#555;
+  margin:8px 0 4px;
+}
+.image-box{
+  border:1px solid #ccc;
+  border-radius:4px;
+  padding:10px;
+  min-height:80px;
+  font-size:.9rem;
+  color:#555;
+  background:#fafafa;
+  overflow:auto;
+}
+.image-box img{
+  max-width:100%;
+  height:auto;
+  display:block;
+  margin-bottom:6px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>マルチSNS投稿ハブ</h2>
+
+  <div class="note">
+    PC：ブックマークレットから開くとタイトル＋URLが自動で入ります。<br>
+    Android：共有メニューから「投稿ハブ」を選ぶとURLが自動入力されます。
+  </div>
+
+  <input type="text" id="urlInput" placeholder="スマホではここに商品URLが自動入力されます（Amazon / Rakuten / Yahoo）">
+
+  <button id="readClipboard" style="display:none;">クリップボードから読み込む</button>
+
+  <button id="generate">投稿文を生成</button>
+
+  <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
+
+  <div class="image-note">
+    検索結果やキャンペーン画面のスクショなど、アイキャッチにしたい画像をここにペースト（Ctrl+V）またはドラッグ＆ドロップしてください。<br>
+    各SNSの投稿画面が開いたら、本文をペーストした後に画像も Ctrl+V で貼り付けてください。
+  </div>
+
+  <div id="imageBox" class="image-box">
+    ここに画像をペースト（Ctrl+V）またはドラッグ＆ドロップ
+  </div>
+
+  <button id="showSNS">投稿</button>
+  <button id="closeAll" style="background:#ff4d4d;color:#fff;">すべて閉じる</button>
+
+  <div id="snsButtons">
+    <button class="sns-btn" id="btnX">X に投稿</button>
+    <button class="sns-btn" id="btnThreads">Threads に投稿</button>
+    <button class="sns-btn" id="btnBsky">Bluesky に投稿</button>
+    <button class="sns-btn" id="btnFb">Facebook に投稿</button>
+  </div>
+</div>
+
 <script>
 (function(){
 
@@ -170,7 +277,7 @@
     if(winX) winX.opener=null;
   };
 
-  /* ---- Threads（opener切断 → 再利用不可 → 毎回閉じて開く） ---- */
+  /* ---- Threads（毎回閉じて開く） ---- */
   document.getElementById("btnThreads").onclick=()=>{
     if(winThreads && !winThreads.closed) winThreads.close();
     winThreads = window.open("https://www.threads.net/intent/post", "SNS_THREADS");
@@ -190,7 +297,7 @@
     if(winBsky) winBsky.opener=null;
   };
 
-  /* ---- Facebook（opener切断 → 再利用不可 → 毎回閉じて開く） ---- */
+  /* ---- Facebook（毎回閉じて開く） ---- */
   document.getElementById("btnFb").onclick=()=>{
     if(winFb && !winFb.closed) winFb.close();
     winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
@@ -316,3 +423,6 @@
 
 })();
 </script>
+
+</body>
+</html>
