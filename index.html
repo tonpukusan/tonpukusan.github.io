@@ -535,9 +535,14 @@ function openExternal(app, url, textToCopy){
 
   document.getElementById("closeAll").onclick = () => {
     closeAll();
+      // Androidアプリ内なら閉じない（アプリが消えるのを防ぐ）
+  if (typeof window.Android !== "undefined") return;
+
     window.close();
   };
+if (typeof window.Android === "undefined") {
   window.addEventListener("beforeunload", closeAll);
+}
 
 })();
 </script>
