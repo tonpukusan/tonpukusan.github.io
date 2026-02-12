@@ -105,7 +105,42 @@ button{
     <button class="sns-btn" id="btnPinterest">Pinterest に投稿</button>
   </div>
 </div>
+  
 <script>
+/* =============================
+   共通判定ユーティリティ
+============================= */
+
+function extractFirstUrl(text){
+  return text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+}
+
+function isValueCommerce(url){
+  return url.includes("ck.jp.ap.valuecommerce.com/servlet/");
+}
+
+function hasAmazonTag(url){
+  return /[?&]tag=/.test(url);
+}
+
+function hasRakutenAff(url){
+  return url.includes("rafcid=") || url.includes("scid=af_");
+}
+
+function isAmazon(url){
+  return /amazon\.(co\.jp|jp|asia)/i.test(url) || /amzn\.(to|asia)/i.test(url);
+}
+
+function isRakuten(url){
+  return /rakuten\.(co\.jp|ne\.jp)/i.test(url) || url.includes("a.r10.to");
+}
+
+function isYahoo(url){
+  return url.includes("shopping.yahoo.co.jp") ||
+         url.includes("store.shopping.yahoo.co.jp") ||
+         url.includes("yahoo.jp/");
+}
+
 (function(){
 
   let winX=null, winThreads=null, winBsky=null, winFb=null;
@@ -160,70 +195,72 @@ button{
   /* -----------------------------
      アフィリンク生成
   ----------------------------- */
-  function generateAmazonLink(url){
-    if(!url.includes("amazon.co.jp")) return null;
+function generateAmazonLink(url){
+  if(!isAmazon(url)) return null;
 
-    let asin=null;
-    let m1=url.match(/\/dp\/([A-Z0-9]{10})/i);
-    let m2=url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
-    let m3=url.match(/\/product\/([A-Z0-9]{10})/i);
-    if(m1) asin=m1[1];
-    if(m2) asin=m2[1];
-    if(m3) asin=m3[1];
+  if(hasAmazonTag(url)) return url;
 
-    if(asin){
-      return "https://www.amazon.co.jp/dp/"+asin+"?tag=yusatosh-22";
-    }
-    return url+(url.includes("?")?"&":"?")+"tag=yusatosh-22";
+  let asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+                  url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+
+  if(asinMatch){
+    return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=yusatosh-22";
   }
 
-  function generateRakutenLink(url){
-    if(!/rakuten\.(co\.jp|ne\.jp)/.test(url)) return null;
-    let base="https://hb.afl.rakuten.co.jp/hgc/15844848.ec827d24.15844849.84443345/";
-    return base+"?pc="+encodeURIComponent(url)+"&link_type=hybrid_url";
-  }
+  return url + (url.includes("?") ? "&" : "?") + "tag=yusatosh-22";
+}
 
-  function generateYahooLink(url){
-    if(
-      url.includes("store.shopping.yahoo.co.jp") ||
-      (url.includes("shopping.yahoo.co.jp") &&
-       (url.includes("/search") || url.includes("/promotion") || url.includes("/product")))
-    ){
-      return "https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
-    }
-    return null;
+function generateRakutenLink(url){
+  if(!isRakuten(url)) return null;
+
+  if(hasRakutenAff(url)) return url;
+
+  return url + (url.includes("?") ? "&" : "?") +
+         "scid=af_pc_etc&rafcid=15844848.ec827d24.15844849.84443345";
+}
+
+function generateYahooLink(url){
+  if(url.includes("yahoo.jp/")) return url;
+
+  if(
+    url.includes("store.shopping.yahoo.co.jp") ||
+    url.includes("shopping.yahoo.co.jp")
+  ){
+    return "https://ck.jp.ap.valuecommerce.com/servlet/referral" +
+      "?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
   }
+  return null;
+}
 
   /* -----------------------------
      URL＋タイトル → 投稿文生成
   ----------------------------- */
-  function generateFromURL(url,rawTitle){
-    if(!url) return "";
+function generateFromURL(url,rawTitle){
+  if(!url) return "";
 
-    let amazon=generateAmazonLink(url);
-    if(amazon){
-      let title=cleanAmazonTitle(rawTitle);
-      return "#密林偵察 #Amazonセール情報 #AD\n" +
-             (title ? title+"\n" : "") +
-             amazon;
-    }
-
-    let rakuten=generateRakutenLink(url);
-    if(rakuten){
-      return "#楽天偵察 #セール情報 #AD\n" +
-             (rawTitle ? rawTitle+"\n" : "") +
-             rakuten;
-    }
-
-    let yahoo=generateYahooLink(url);
-    if(yahoo){
-      return "#Yahoo偵察 #AD\n" +
-             (rawTitle ? rawTitle+"\n" : "") +
-             yahoo;
-    }
-
-    return rawTitle ? rawTitle+"\n"+url : url;
+  if(isAmazon(url)){
+    const aff = generateAmazonLink(url);
+    return "#密林偵察 #Amazonセール情報 #PR\n" +
+           (rawTitle ? rawTitle + "\n\n" : "") +
+           aff;
   }
+
+  if(isRakuten(url)){
+    const aff = generateRakutenLink(url);
+    return "#楽天偵察 #PR\n" +
+           (rawTitle ? rawTitle + "\n\n" : "") +
+           aff;
+  }
+
+  if(isYahoo(url)){
+    const aff = generateYahooLink(url);
+    return "#Yahoo偵察 #PR\n" +
+           (rawTitle ? rawTitle + "\n\n" : "") +
+           aff;
+  }
+
+  return rawTitle ? rawTitle + "\n" + url : url;
+}
 
   /* -----------------------------
      投稿文生成ボタン
@@ -406,6 +443,23 @@ button{
      → ポップアップブロック対策
   ----------------------------- */
   document.getElementById("showSNS").onclick = () => {
+
+    const text = textarea.value;
+const url = extractFirstUrl(text);
+
+if(isValueCommerce(url)){
+  document.getElementById("btnThreads").style.display="none";
+  document.getElementById("btnBsky").style.display="none";
+  document.getElementById("btnFb").style.display="none";
+  document.getElementById("btnPinterest").style.display="none";
+}else{
+  document.getElementById("btnThreads").style.display="block";
+  document.getElementById("btnBsky").style.display="block";
+  document.getElementById("btnFb").style.display="block";
+}
+
+
+    
     navigator.clipboard.writeText(textarea.value).catch(()=>{});
     document.getElementById("snsButtons").style.display="block";
   };
