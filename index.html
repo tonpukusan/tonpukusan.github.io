@@ -110,7 +110,6 @@ button{
 /* =============================
    共通判定ユーティリティ
 ============================= */
-
 function extractFirstUrl(text){
   return text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
 }
@@ -124,7 +123,7 @@ function hasAmazonTag(url){
 }
 
 function hasRakutenAff(url){
-  return url.includes("rafcid=") || url.includes("scid=af_");
+  return url.includes("rafcid=") || url.includes("scid=af_") || url.includes("hb.afl.rakuten.co.jp") || url.includes("a.r10.to");
 }
 
 function isAmazon(url){
@@ -132,7 +131,7 @@ function isAmazon(url){
 }
 
 function isRakuten(url){
-  return /rakuten\.(co\.jp|ne\.jp)/i.test(url) || url.includes("a.r10.to");
+  return /rakuten\.(co\.jp|ne\.jp)/i.test(url) || url.includes("a.r10.to") || url.includes("hb.afl.rakuten.co.jp");
 }
 
 function isYahoo(url){
@@ -141,8 +140,28 @@ function isYahoo(url){
          url.includes("yahoo.jp/");
 }
 
-(function(){
+// Androidアプリ(WebView)内か判定：JavascriptInterface "Android" がいるかどうかで判定
+function hasAndroidBridge(){
+  return typeof window.Android !== "undefined" &&
+         typeof window.Android.copyToClipboard === "function" &&
+         typeof window.Android.openApp === "function";
+}
 
+// 外部アプリ優先で開く（Androidアプリ内だけ）
+function openExternal(app, url, textToCopy){
+  if(hasAndroidBridge()){
+    try{
+      if(textToCopy) Android.copyToClipboard(textToCopy);
+      Android.openApp(app, url);
+      return true;
+    }catch(e){
+      // 失敗したらWeb fallback
+    }
+  }
+  return false;
+}
+
+(function(){
   let winX=null, winThreads=null, winBsky=null, winFb=null;
   const textarea=document.getElementById("text");
   const urlInput=document.getElementById("urlInput");
@@ -168,25 +187,21 @@ function isYahoo(url){
     }
     textarea.value=combined;
   }
-
   if(sharedUrl){
     urlInput.value=sharedUrl;
   }
 
   /* -----------------------------
-     Amazonタイトル整形
+     Amazonタイトル整形（必要なら）
   ----------------------------- */
   function cleanAmazonTitle(title){
     if(!title) return "";
-
     title = title.replace(/^Amazon\s*\|\s*/i, "");
     title = title.replace(/^Amazon\.co\.jp:\s*/i, "");
     title = title.replace(/\s*:\s*[^:]+$/i, "");
-
     let parts = title.split("|").map(s => s.trim());
     let product = parts[0] || "";
     let maker   = parts[1] || "";
-
     if (maker && product.includes(maker)) return product;
     if (maker) return maker + " " + product;
     return product;
@@ -195,106 +210,162 @@ function isYahoo(url){
   /* -----------------------------
      アフィリンク生成
   ----------------------------- */
-function generateAmazonLink(url){
-  if(!isAmazon(url)) return null;
+  function generateAmazonLink(url){
+    if(!isAmazon(url)) return null;
 
-  if(hasAmazonTag(url)) return url;
+    // 既に自分のtagが付いてるならそのまま
+    // （他人tagでも上書きしたい要件があるので、あとで上書き処理）
+    // まずは後段で統一するためここでは「tag付きはそのまま返す」
+    if(hasAmazonTag(url)) return url;
 
-  let asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/i) ||
-                  url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+    // ASIN抽出（dp/gp/product）
+    let asinMatch =
+      url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+      url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
 
-  if(asinMatch){
-    return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=yusatosh-22";
+    if(asinMatch){
+      return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=yusatosh-22";
+    }
+
+    // amzn.asia/d/xxxxx は ASINとは限らないため、ここでは無理に変換しない
+    // とりあえずtag付与で最低限（ただし成果になる保証は薄い）
+    return url + (url.includes("?") ? "&" : "?") + "tag=yusatosh-22";
   }
 
-  return url + (url.includes("?") ? "&" : "?") + "tag=yusatosh-22";
-}
-
-function generateRakutenLink(url){
-  if(!isRakuten(url)) return null;
-
-  if(hasRakutenAff(url)) return url;
-
-  return url + (url.includes("?") ? "&" : "?") +
-         "scid=af_pc_etc&rafcid=15844848.ec827d24.15844849.84443345";
-}
-
-function generateYahooLink(url){
-  if(url.includes("yahoo.jp/")) return url;
-
-  if(
-    url.includes("store.shopping.yahoo.co.jp") ||
-    url.includes("shopping.yahoo.co.jp")
-  ){
-    return "https://ck.jp.ap.valuecommerce.com/servlet/referral" +
-      "?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
+  function overwriteAmazonTagToMine(url){
+    // 既存tagを自分tagに強制上書き（要件⑤）
+    try{
+      const u = new URL(url);
+      u.searchParams.set("tag", "yusatosh-22");
+      return u.toString();
+    }catch(e){
+      // URLとしてパースできない場合はそのまま
+      return url;
+    }
   }
-  return null;
-}
+
+  function generateRakutenLink(url){
+    if(!isRakuten(url)) return null;
+
+    // 既に楽天アフィリ（hb.afl / a.r10.to / rafcid 等）ならそのまま
+    if(hasRakutenAff(url)) return url;
+
+    // A方式：まずは最小で scid/rafcid を付与（※楽天側仕様の揺れはある）
+    // 既存のあなたのIDを使う（要件：ソースから読める）
+    return url + (url.includes("?") ? "&" : "?") +
+           "scid=af_pc_etc&rafcid=15844848.ec827d24.15844849.84443345";
+  }
+
+  function generateYahooLink(url){
+    // Yahoo公式短縮リンクはそのまま（あなたの説明通り）
+    if(url.includes("yahoo.jp/")) return url;
+
+    // ValueCommerce形式に変換
+    if(url.includes("store.shopping.yahoo.co.jp") || url.includes("shopping.yahoo.co.jp")){
+      return "https://ck.jp.ap.valuecommerce.com/servlet/referral" +
+        "?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
+    }
+    return null;
+  }
 
   /* -----------------------------
-     URL＋タイトル → 投稿文生成
+     投稿文生成
+     ルール：
+     - 既存テキスト(rawTitle)があるなら、#タグ と URL の間に残す（要件④）
+     - Amazon/Yahoo/Rakuten は #AD → #PR
   ----------------------------- */
-function generateFromURL(url,rawTitle){
-  if(!url) return "";
+  function generateFromURL(url, rawTitle){
+    if(!url) return "";
 
-  if(isAmazon(url)){
-    const aff = generateAmazonLink(url);
-    return "#密林偵察 #Amazonセール情報 #PR\n" +
-           (rawTitle ? rawTitle + "\n\n" : "") +
-           aff;
+    // rawTitle は「共有文の1行目」など。ここではそのまま残す（細かな除去は後で仕様化）
+    const mid = rawTitle ? (rawTitle + "\n\n") : "";
+
+    if(isAmazon(url)){
+      let aff = generateAmazonLink(url);
+      if(!aff) aff = url;
+      // tag上書き（要件⑤）
+      aff = overwriteAmazonTagToMine(aff);
+
+      return "#密林偵察 #Amazonセール情報 #PR\n" +
+             mid +
+             aff;
+    }
+
+    if(isRakuten(url)){
+      const aff = generateRakutenLink(url) || url;
+      return "#楽天偵察 #PR\n" +
+             mid +
+             aff;
+    }
+
+    if(isYahoo(url)){
+      const aff = generateYahooLink(url) || url;
+      return "#Yahoo偵察 #PR\n" +
+             mid +
+             aff;
+    }
+
+    // 一般URL（要件：ハッシュタグ無し）
+    return rawTitle ? (rawTitle + "\n" + url) : url;
   }
-
-  if(isRakuten(url)){
-    const aff = generateRakutenLink(url);
-    return "#楽天偵察 #PR\n" +
-           (rawTitle ? rawTitle + "\n\n" : "") +
-           aff;
-  }
-
-  if(isYahoo(url)){
-    const aff = generateYahooLink(url);
-    return "#Yahoo偵察 #PR\n" +
-           (rawTitle ? rawTitle + "\n\n" : "") +
-           aff;
-  }
-
-  return rawTitle ? rawTitle + "\n" + url : url;
-}
 
   /* -----------------------------
      投稿文生成ボタン
+     ※ あなたの要件で「現行の2行前提は無視」→ URLは本文内から拾う
   ----------------------------- */
-  document.getElementById("generate").onclick=()=>{
-    let raw=textarea.value.trim();
-    let title="", url="";
+  document.getElementById("generate").onclick = () => {
+    const raw = textarea.value || "";
+    let url = extractFirstUrl(raw);
+    let title = "";
 
-    if(raw){
-      let lines=raw.split("\n");
-      if(lines.length>=2){
-        title=lines[0].trim();
-        url=lines[1].trim();
-      }
+    // title はURLを除いた先頭行を使う（共有文が「文章＋URL」でも拾える）
+    if(raw.trim()){
+      const firstLine = raw.split("\n")[0].trim();
+      title = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
+      // Amazonの場合だけ整形してもよい（現状維持）
+      if(isAmazon(url)) title = cleanAmazonTitle(title);
+      // 楽天アプリの [楽天] などは残す/削るは後で仕様、いったん軽く削る
+      title = title.replace(/^\[楽天\]\s*/i, "");
     }
 
-    if(!url) url=urlInput.value.trim();
+    if(!url) url = (urlInput.value || "").trim();
     if(!url) return;
 
-    if(generateYahooLink(url)){
-      document.getElementById("btnThreads").style.display="none";
-      document.getElementById("btnBsky").style.display="none";
-      document.getElementById("btnFb").style.display="none";
-    }else{
-      document.getElementById("btnThreads").style.display="block";
-      document.getElementById("btnBsky").style.display="block";
-      document.getElementById("btnFb").style.display="block";
-    }
+    textarea.value = generateFromURL(url, title);
 
-    textarea.value=generateFromURL(url,title);
+    // Pinterest表示制御などの更新
+    updatePinterestButtonVisibility();
   };
 
   /* -----------------------------
-     画像ペースト／ドラッグ＆ドロップ
+     Pinterest ボタン表示制御（現状維持＋微調整）
+  ----------------------------- */
+  function updatePinterestButtonVisibility(){
+    const text = textarea.value.trim();
+    const url = extractFirstUrl(text);
+    const btn = document.getElementById("btnPinterest");
+
+    if(!url){
+      btn.style.display="none";
+      return;
+    }
+
+    const isBlogger =
+      url.includes("small-fishing.com") ||
+      url.includes("fishingtonpuku.blogspot.com") ||
+      url.includes("tonpuku3fishing.blogspot.com");
+
+    // 楽天 or Blogger は表示、それ以外は非表示（現行方針）
+    if(isRakuten(url) || isBlogger){
+      btn.style.display="block";
+    }else{
+      btn.style.display="none";
+    }
+  }
+  textarea.addEventListener("input", updatePinterestButtonVisibility);
+
+  /* -----------------------------
+     画像ペースト／ドラッグ＆ドロップ（現状維持）
   ----------------------------- */
   function handleImageFile(file){
     if(!file || !file.type.startsWith("image/")) return;
@@ -321,7 +392,6 @@ function generateFromURL(url,rawTitle){
       }
     }
   });
-
   imageBox.addEventListener("dragover",e=>e.preventDefault());
   imageBox.addEventListener("drop",e=>{
     e.preventDefault();
@@ -331,200 +401,117 @@ function generateFromURL(url,rawTitle){
   });
 
   /* -----------------------------
-     Pinterest ボタン表示制御
-     - 楽天 → 表示
-     - Blogger → 表示
-     - Amazon → 非表示
-     - Yahoo（VC）→ 非表示
-     - その他 → 非表示
+     Android向け readClipboard（現状維持）
   ----------------------------- */
-  function updatePinterestButtonVisibility(){
-    const text = textarea.value.trim();
-    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-
-    const btn = document.getElementById("btnPinterest");
-
-    if(!url){
-      btn.style.display = "none";
-      return;
-    }
-
-    const isAmazon = url.includes("amazon.co.jp") || url.includes("amzn.to");
-    const isRakuten = /rakuten\.(co\.jp|ne\.jp)/.test(url);
-    const isYahoo = url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp");
-
-    const isBlogger =
-      url.includes("small-fishing.com") ||
-      url.includes("fishingtonpuku.blogspot.com") ||
-      url.includes("tonpuku3fishing.blogspot.com");
-
-    if(isRakuten || isBlogger){
-      btn.style.display = "block";
-    } else {
-      btn.style.display = "none";
-    }
-  }
-
-  /* 投稿文生成後に Pinterest ボタン表示制御 */
-  document.getElementById("generate").addEventListener("click", updatePinterestButtonVisibility);
-  textarea.addEventListener("input", updatePinterestButtonVisibility);
-
-
-  /* -----------------------------
-     Android向け readText
-  ----------------------------- */
-  const ua = navigator.userAgent;
-  const isAndroid = /Android/.test(ua);
-
-  if (isAndroid) {
-    document.getElementById("readClipboard").style.display = "block";
-  }
+  const isAndroid = /Android/.test(navigator.userAgent);
+  if (isAndroid) document.getElementById("readClipboard").style.display = "block";
 
   document.getElementById("readClipboard").addEventListener("click", () => {
     navigator.clipboard.readText()
-      .then(text => processSharedText(text))
+      .then(text => { textarea.value = text || ""; })
       .catch(() => alert("クリップボードの読み取りが許可されていません"));
   });
 
-  function processSharedText(text){
-    if(!text) return;
+  /* -----------------------------
+     SNSボタン表示（ValueCommerceならX以外を隠す）
+  ----------------------------- */
+  function applySnsVisibilityByCurrentText(){
+    const text = textarea.value || "";
+    const url = extractFirstUrl(text);
 
-    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-    if(!url){
-      alert("URLが見つかりませんでした");
-      return;
+    const isVC = url && isValueCommerce(url);
+
+    // まず全部出す
+    document.getElementById("btnThreads").style.display="block";
+    document.getElementById("btnBsky").style.display="block";
+    document.getElementById("btnFb").style.display="block";
+    document.getElementById("btnPinterest").style.display="block";
+
+    // VCならX以外を隠す（要件⑤）
+    if(isVC){
+      document.getElementById("btnThreads").style.display="none";
+      document.getElementById("btnBsky").style.display="none";
+      document.getElementById("btnFb").style.display="none";
+      document.getElementById("btnPinterest").style.display="none";
     }
 
-    let firstLine = text.split("\n")[0].trim();
-    firstLine = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-    if(url.includes("amzn.to") || url.includes("amzn.asia")){
-      textarea.value =
-        "#密林偵察 #Amazonセール情報 #AD\n" +
-        firstLine + "\n" +
-        url.trim();
-      return;
-    }
-
-    if(url.includes("amazon.co.jp")){
-      const clean = cleanAmazonTitle(firstLine);
-      const aff = generateAmazonLink(url);
-      textarea.value =
-        "#密林偵察 #Amazonセール情報 #AD\n" +
-        clean + "\n" +
-        aff;
-      return;
-    }
-
-    if(/rakuten\.(co\.jp|ne\.jp)/.test(url)){
-      const cleanTitle = firstLine.replace(/^\[楽天\]\s*/i, "");
-      const aff = generateRakutenLink(url);
-      textarea.value =
-        "#楽天偵察 #セール情報 #AD\n" +
-        cleanTitle + "\n" +
-        aff;
-      return;
-    }
-
-    if(url.includes("shopping.yahoo.co.jp") || url.includes("store.shopping.yahoo.co.jp")){
-      const aff = generateYahooLink(url);
-      textarea.value =
-        "#Yahoo偵察 #AD\n" +
-        firstLine + "\n" +
-        aff;
-      return;
-    }
-
-    textarea.value = firstLine + "\n" + url;
+    // Pinterestは別ルールでも制御
+    updatePinterestButtonVisibility();
   }
 
-  /* -----------------------------
-     SNS投稿ボタン（async禁止）
-     → ポップアップブロック対策
-  ----------------------------- */
   document.getElementById("showSNS").onclick = () => {
+    applySnsVisibilityByCurrentText();
 
-    const text = textarea.value;
-const url = extractFirstUrl(text);
+    // ここで必ずコピー（PCでも便利）
+    const text = textarea.value || "";
+    navigator.clipboard.writeText(text).catch(()=>{});
 
-if(isValueCommerce(url)){
-  document.getElementById("btnThreads").style.display="none";
-  document.getElementById("btnBsky").style.display="none";
-  document.getElementById("btnFb").style.display="none";
-  document.getElementById("btnPinterest").style.display="none";
-}else{
-  document.getElementById("btnThreads").style.display="block";
-  document.getElementById("btnBsky").style.display="block";
-  document.getElementById("btnFb").style.display="block";
-}
-
-
-    
-    navigator.clipboard.writeText(textarea.value).catch(()=>{});
     document.getElementById("snsButtons").style.display="block";
   };
 
   /* -----------------------------
-     X（再利用可能）
+     SNS起動：Androidアプリ内なら外部アプリ優先
+     それ以外は従来通り window.open
   ----------------------------- */
-  document.getElementById("btnX").onclick = () => {
-    const url = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(textarea.value);
 
-    if (!winX || winX.closed) {
+  // X
+  document.getElementById("btnX").onclick = () => {
+    const text = textarea.value || "";
+    const url = "https://x.com/intent/post?text=" + encodeURIComponent(text);
+
+    // Androidアプリ内：コピー→外部アプリ起動
+    if(openExternal("x", url, text)) return;
+
+    // Web fallback
+    if(!winX || winX.closed){
       winX = window.open(url, "SNS_X");
-    } else {
-      try {
-        winX.location.href = url;
-        winX.focus();
-      } catch(e) {
-        winX.close();
-        winX = window.open(url, "SNS_X");
-      }
+    }else{
+      try{ winX.location.href = url; winX.focus(); }
+      catch(e){ winX.close(); winX = window.open(url, "SNS_X"); }
     }
   };
 
-  /* -----------------------------
-     Threads（毎回閉じて開く）
-  ----------------------------- */
+  // Threads（本文URL注入は期待できないので、コピー→起動）
   document.getElementById("btnThreads").onclick = () => {
-    if (winThreads && !winThreads.closed) winThreads.close();
-    winThreads = window.open("https://www.threads.net/intent/post", "SNS_THREADS");
+    const text = textarea.value || "";
+    const url = "https://www.threads.net/intent/post";
+
+    if(openExternal("threads", url, text)) return;
+
+    if(winThreads && !winThreads.closed) winThreads.close();
+    winThreads = window.open(url, "SNS_THREADS");
   };
 
-  /* -----------------------------
-     Bluesky（再利用可能）
-  ----------------------------- */
+  // Bluesky（コピー→起動）
   document.getElementById("btnBsky").onclick = () => {
+    const text = textarea.value || "";
     const url = "https://bsky.app";
 
-    if (!winBsky || winBsky.closed) {
+    if(openExternal("bsky", url, text)) return;
+
+    if(!winBsky || winBsky.closed){
       winBsky = window.open(url, "SNS_BSKY");
-    } else {
-      try {
-        winBsky.location.href = url;
-        winBsky.focus();
-      } catch(e) {
-        winBsky.close();
-        winBsky = window.open(url, "SNS_BSKY");
-      }
+    }else{
+      try{ winBsky.location.href = url; winBsky.focus(); }
+      catch(e){ winBsky.close(); winBsky = window.open(url, "SNS_BSKY"); }
     }
   };
 
-  /* -----------------------------
-     Facebook（毎回閉じて開く）
-  ----------------------------- */
+  // Facebook（コピー→起動）
   document.getElementById("btnFb").onclick = () => {
-    if (winFb && !winFb.closed) winFb.close();
-    winFb = window.open("https://www.facebook.com/home.php", "SNS_FB");
+    const text = textarea.value || "";
+    const url = "https://www.facebook.com/";
+
+    if(openExternal("facebook", url, text)) return;
+
+    if(winFb && !winFb.closed) winFb.close();
+    winFb = window.open(url, "SNS_FB");
   };
 
-  /* -----------------------------
-     Pinterest（楽天 or Blogger のみ）
-  ----------------------------- */
+  // Pinterest（コピー→起動、Web fallbackは現行のpin-builder）
   document.getElementById("btnPinterest").onclick = () => {
     const text = textarea.value.trim();
-    const url = text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-
+    const url = extractFirstUrl(text);
     if(!url) return;
 
     const pinterestUrl =
@@ -532,11 +519,13 @@ if(isValueCommerce(url)){
       "url=" + encodeURIComponent(url) +
       "&description=" + encodeURIComponent(text);
 
+    if(openExternal("pinterest", pinterestUrl, text)) return;
+
     window.open(pinterestUrl, "SNS_PINTEREST");
   };
 
   /* -----------------------------
-     全SNSタブを閉じる
+     全SNSタブを閉じる（Web用）
   ----------------------------- */
   function closeAll(){
     [winX, winThreads, winBsky, winFb].forEach(w=>{
@@ -548,7 +537,6 @@ if(isValueCommerce(url)){
     closeAll();
     window.close();
   };
-
   window.addEventListener("beforeunload", closeAll);
 
 })();
