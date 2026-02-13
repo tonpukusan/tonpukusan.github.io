@@ -6,107 +6,201 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{
-  font-family:system-ui,sans-serif;
-  margin:0;
-  padding:20px;
-  background:#fff;
-}
-.container{
-  max-width:600px;
-  margin:auto;
-}
-textarea,input[type="text"]{
-  width:100%;
-  padding:10px;
-  font-size:1rem;
-  margin-bottom:10px;
-}
-textarea{
-  height:120px;
-}
-button{
-  padding:12px 16px;
-  margin:6px 0;
-  font-size:1.1rem;
-  cursor:pointer;
-  width:100%;
-}
-#snsButtons{
-  margin-top:20px;
-  display:none;
-}
-.sns-btn{
-  margin-bottom:10px;
-}
-.note{
-  font-size:.85rem;
-  color:#555;
-  margin-bottom:8px;
-}
-.image-note{
-  font-size:.85rem;
-  color:#555;
-  margin:8px 0 4px;
-}
-.image-box{
-  border:1px solid #ccc;
-  border-radius:4px;
-  padding:10px;
-  min-height:80px;
-  font-size:.9rem;
-  color:#555;
-  background:#fafafa;
-  overflow:auto;
-}
-.image-box img{
-  max-width:100%;
-  height:auto;
-  display:block;
-  margin-bottom:6px;
-}
+  body{
+    font-family:system-ui,sans-serif;
+    margin:0;
+    padding:14px;
+    background:#fff;
+  }
+  .container{
+    max-width:600px;
+    margin:auto;
+  }
+
+  /* ====== ヘッダー（コンパクト） ====== */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .topbar h2{
+    margin:0;
+    font-size:1.05rem;
+  }
+  .icon-btn{
+    width:auto;
+    padding:6px 10px;
+    font-size:1rem;
+    border-radius:10px;
+    border:1px solid #ddd;
+    background:#f7f7f7;
+    cursor:pointer;
+  }
+
+  /* ====== 折り畳み（詳細） ====== */
+  details.advanced{
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:8px 10px;
+    margin-bottom:10px;
+    background:#fff;
+  }
+  details.advanced summary{
+    cursor:pointer;
+    font-size:.95rem;
+    color:#333;
+  }
+
+  textarea,input[type="text"]{
+    width:100%;
+    padding:10px;
+    font-size:1rem;
+    margin:10px 0;
+    box-sizing:border-box;
+  }
+  textarea{
+    height:120px;
+  }
+
+  /* ====== ボタン（小さめ） ====== */
+  button{
+    padding:10px 12px;
+    margin:6px 0;
+    font-size:1rem;
+    cursor:pointer;
+    width:100%;
+    border-radius:12px;
+    border:1px solid #ddd;
+    background:#fff;
+  }
+  .btn-small{
+    padding:8px 10px;
+    font-size:.95rem;
+  }
+  .btn-primary{
+    font-weight:700;
+    border-color:#bbb;
+    background:#f3f3f3;
+  }
+  .btn-danger{
+    background:#ff4d4d;
+    color:#fff;
+    border-color:#ff4d4d;
+  }
+
+  /* ====== 画像ボックス（低め） ====== */
+  .image-box{
+    border:1px solid #ccc;
+    border-radius:10px;
+    padding:8px 10px;
+    min-height:56px;
+    font-size:.85rem;
+    color:#555;
+    background:#fafafa;
+    overflow:auto;
+    box-sizing:border-box;
+  }
+  .image-box img{
+    max-width:100%;
+    height:auto;
+    display:block;
+    margin-bottom:6px;
+  }
+
+  /* ====== 下部sticky操作バー ====== */
+  .actionbar{
+    position:sticky;
+    bottom:0;
+    background:#fff;
+    padding:10px 0 6px;
+    border-top:1px solid #ddd;
+    margin-top:10px;
+  }
+  .actionbar .row{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:8px;
+    align-items:stretch;
+  }
+  .actionbar .row + .row{
+    margin-top:8px;
+  }
+
+  /* SNSボタンを2列グリッド化 */
+  #snsButtons{
+    display:none;
+  }
+  .sns-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr; /* 2列 */
+    gap:8px;
+  }
+  .sns-btn{
+    margin:0;
+    padding:10px 8px;
+    font-size:1rem;
+    width:100%;
+    border-radius:12px;
+  }
+
+  /* stickyが本文に被らない保険 */
+  body{ padding-bottom:180px; }
 </style>
 </head>
 
 <body>
 <div class="container">
-  <h2>マルチSNS投稿ハブ</h2>
 
-  <div class="note">
-    PC：ブックマークレットから開くとタイトル＋URLが自動で入ります。<br>
-    Android：共有メニューから「投稿ハブ」を選ぶとURLが自動入力されます。
+  <div class="topbar">
+    <h2>PostHub</h2>
+    <button id="helpBtn" class="icon-btn" type="button">ⓘ</button>
   </div>
 
-  <input type="text" id="urlInput" placeholder="スマホではここに商品URLが自動入力されます（Amazon / Rakuten / Yahoo）">
+  <!-- 詳細は折り畳み -->
+  <details class="advanced" id="advancedBox">
+    <summary>詳細</summary>
 
-  <button id="readClipboard" style="display:none;">クリップボードから読み込む</button>
+    <input type="text" id="urlInput" placeholder="URLだけ貼る（保険）">
 
-  <button id="generate">投稿文を生成</button>
+    <button id="readClipboard" class="btn-small" style="display:none;">クリップボードから読み込む</button>
 
-  <textarea id="text" placeholder="PCではここにタイトル＋URLが入ります。スマホでは任意で紹介文を書き足してもOKです。"></textarea>
+  </details>
 
-  <div class="image-note">
-    アイキャッチにしたい画像をここにペースト（Ctrl+V）またはドラッグ＆ドロップ。<br>
-    各SNSの投稿画面が開いたら、本文をペーストした後に画像も Ctrl+V で貼り付け。
-  </div>
+  <button id="generate" class="btn-small">投稿文を生成</button>
+
+  <textarea id="text" placeholder="本文（共有で入ります。追記してOK）"></textarea>
 
   <div id="imageBox" class="image-box">
-    ここに画像をペースト（Ctrl+V）またはドラッグ＆ドロップ
+    画像をペースト（Ctrl+V）またはドラッグ＆ドロップ（任意）
   </div>
 
-  <button id="showSNS">投稿</button>
-  <button id="clearDraft" style="display:none;background:#eee;">下書きクリア</button>
-  <button id="closeAll" style="background:#ff4d4d;color:#fff;">すべて閉じる</button>
+  <!-- 下部sticky操作バー（投稿・クリア・閉じる＋SNS） -->
+  <div class="actionbar">
+    <div class="row">
+      <button id="showSNS" class="btn-primary">投稿</button>
+      <button id="clearDraft" style="display:none;background:#eee;">下書きクリア</button>
+    </div>
 
-  <div id="snsButtons">
-    <button class="sns-btn" id="btnX">X に投稿</button>
-    <button class="sns-btn" id="btnThreads">Threads に投稿</button>
-    <button class="sns-btn" id="btnBsky">Bluesky に投稿</button>
-    <button class="sns-btn" id="btnFb">Facebook に投稿</button>
-    <button class="sns-btn" id="btnPinterest">Pinterest に投稿</button>
+    <div class="row">
+      <button id="closeAll" class="btn-danger">すべて閉じる</button>
+      <!-- 右側は空き：将来用（今は非表示にしないならダミー） -->
+      <button type="button" style="visibility:hidden;">.</button>
+    </div>
+
+    <div id="snsButtons">
+      <div class="sns-grid">
+        <button class="sns-btn" id="btnX">X</button>
+        <button class="sns-btn" id="btnThreads">Threads</button>
+        <button class="sns-btn" id="btnBsky">Bluesky</button>
+        <button class="sns-btn" id="btnFb">Facebook</button>
+        <button class="sns-btn" id="btnPinterest">Pinterest</button>
+      </div>
+    </div>
   </div>
 </div>
-  
+
 <script>
 /* =============================
    共通判定ユーティリティ
@@ -165,6 +259,22 @@ function isAndroidApp(){
 
   const isAndroid = /Android/.test(navigator.userAgent);
   const inAndroidApp = isAndroidApp();
+
+  /* -----------------------------
+     ヘルプ（説明文は排除し、ⓘに集約）
+  ----------------------------- */
+  const helpBtn = document.getElementById("helpBtn");
+  if(helpBtn){
+    helpBtn.addEventListener("click", () => {
+      alert(
+        "使い方：\n" +
+        "1) 共有→本文が入る\n" +
+        "2) 必要なら追記して「投稿」\n" +
+        "3) 各SNSを押して貼り付け（本文はコピーされます）\n\n" +
+        "詳細（URL入力/クリップボード読込）は必要な時だけ開いてください。"
+      );
+    });
+  }
 
   /* -----------------------------
      URLパラメータ（PCブックマークレット／Androidアプリからの ?text=）
@@ -296,9 +406,6 @@ function isAndroidApp(){
 
   /* -----------------------------
      投稿文生成
-     ルール：
-     - 既存テキスト(rawTitle)があるなら、#タグ と URL の間に残す（要件④）
-     - Amazon/Yahoo/Rakuten は #AD → #PR
   ----------------------------- */
   function generateFromURL(url, rawTitle){
     if(!url) return "";
@@ -327,7 +434,6 @@ function isAndroidApp(){
 
   /* -----------------------------
      投稿文生成ボタン
-     - 2行前提は捨ててURLは本文から抽出
   ----------------------------- */
   document.getElementById("generate").onclick = () => {
     const raw = textarea.value || "";
@@ -377,19 +483,17 @@ function isAndroidApp(){
   }
 
   textarea.addEventListener("input", () => {
-    // B方式：入力のたび保存はしない（AndroidもWebも）
-    // ここではボタン表示制御だけ
     updatePinterestButtonVisibility();
   });
 
   /* -----------------------------
-     画像ペースト／ドラッグ＆ドロップ（現状維持）
+     画像ペースト／ドラッグ＆ドロップ
   ----------------------------- */
   function handleImageFile(file){
     if(!file || !file.type.startsWith("image/")) return;
     const reader=new FileReader();
     reader.onload=()=>{
-      if(imageBox && imageBox.textContent.trim().startsWith("ここに画像をペースト")){
+      if(imageBox && imageBox.textContent.trim().startsWith("画像をペースト")){
         imageBox.textContent="";
       }
       const img=document.createElement("img");
@@ -441,13 +545,13 @@ function isAndroidApp(){
      Web/Androidでボタン表示を変える
   ----------------------------- */
 
-  // Androidでは「すべて閉じる」を隠す案（あなたの提案）
+  // Androidでは「すべて閉じる」を隠す（あなたの提案）
   if (isAndroid) {
     const closeBtn = document.getElementById("closeAll");
     if (closeBtn) closeBtn.style.display = "none";
   }
 
-  // Androidだけ「クリア」ボタンがあるなら活かす（無ければ何もしない）
+  // Androidだけ「クリア」を表示
   const clearBtn = document.getElementById("clearDraft");
   if (isAndroid && clearBtn) {
     clearBtn.style.display = "block";
@@ -469,8 +573,7 @@ function isAndroidApp(){
 
   /* -----------------------------
      SNSボタン表示制御
-     - ValueCommerceならX以外を隠す（要件⑤）
-     - Pinterestは別ルールでも制御
+     - ValueCommerceならX以外を隠す
   ----------------------------- */
   function applySnsVisibilityByCurrentText(){
     const text = textarea.value || "";
@@ -483,7 +586,6 @@ function isAndroidApp(){
     const f = document.getElementById("btnFb");
     const p = document.getElementById("btnPinterest");
 
-    // まず全部出す（存在チェック）
     if(t) t.style.display="block";
     if(b) b.style.display="block";
     if(f) f.style.display="block";
@@ -505,7 +607,6 @@ function isAndroidApp(){
   const showBtn = document.getElementById("showSNS");
   if(showBtn){
     showBtn.onclick = () => {
-
       // 1) B方式：投稿ボタン押下時だけ保存
       if(inAndroidApp){
         try { window.Android.saveDraft(textarea.value); } catch(e){}
@@ -519,7 +620,7 @@ function isAndroidApp(){
       // 3) VCならボタン制限
       applySnsVisibilityByCurrentText();
 
-      // 4) SNSボタンを表示
+      // 4) SNSボタン表示
       const sns = document.getElementById("snsButtons");
       if(sns) sns.style.display="block";
     };
@@ -527,22 +628,17 @@ function isAndroidApp(){
 
   /* -----------------------------
      SNS起動
-     - Androidアプリ内：本文をコピーしたうえで「intent://」に遷移させる（WebViewClientが外に出す）
-     - Web：従来通り window.open
-     ※ 重要：いまのAndroid側には openApp が無いので、JSからは呼ばない
+     - Androidアプリ内：コピーして location.href（WebViewClientが外に出す）
+     - Web：window.open
+     ※ 重要：いまのAndroid側には openApp が無いのでJSからは呼ばない
   ----------------------------- */
-
   function openOrPopup(url, winRefName){
-    // Androidアプリ内なら location を書き換える（WebViewClientが外に出す）
     if(inAndroidApp){
-      try{
-        window.Android.copyToClipboard(textarea.value);
-      }catch(e){}
+      try{ window.Android.copyToClipboard(textarea.value); }catch(e){}
       location.href = url;
       return;
     }
 
-    // Web fallback
     let w = null;
     if(winRefName === "X") w = winX;
     if(winRefName === "TH") w = winThreads;
@@ -562,7 +658,6 @@ function isAndroidApp(){
     if(winRefName === "FB") winFb = w;
   }
 
-  // X（下書きURLはできるだけ入れる）
   const btnX = document.getElementById("btnX");
   if(btnX){
     btnX.onclick = () => {
@@ -572,16 +667,13 @@ function isAndroidApp(){
     };
   }
 
-  // Threads（URLで本文注入が弱いので、コピーして起動だけ）
   const btnThreads = document.getElementById("btnThreads");
   if(btnThreads){
     btnThreads.onclick = () => {
-      const url = "https://www.threads.net/intent/post";
-      openOrPopup(url, "TH");
+      openOrPopup("https://www.threads.net/intent/post", "TH");
     };
   }
 
-  // Bluesky
   const btnB = document.getElementById("btnBsky");
   if(btnB){
     btnB.onclick = () => {
@@ -589,7 +681,6 @@ function isAndroidApp(){
     };
   }
 
-  // Facebook
   const btnF = document.getElementById("btnFb");
   if(btnF){
     btnF.onclick = () => {
@@ -597,7 +688,6 @@ function isAndroidApp(){
     };
   }
 
-  // Pinterest（pin-builderはWeb用。Androidはコピーして遷移）
   const btnP = document.getElementById("btnPinterest");
   if(btnP){
     btnP.onclick = () => {
@@ -633,7 +723,6 @@ function isAndroidApp(){
   if(closeAllBtn){
     closeAllBtn.onclick = () => {
       if(inAndroidApp){
-        // Androidアプリでは何もしない（非表示にしている想定）
         return;
       }
       closeAll();
