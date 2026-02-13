@@ -175,7 +175,28 @@ function openExternal(app, url, textToCopy){
   const sharedUrl=params.get("url")||"";
   const sharedText=params.get("text")||"";
   const sharedTitle=params.get("title")||"";
-
+  
+  // ===== 下書き保存（localStorage）=====
+  const DRAFT_KEY = "posthub_draft_v1";
+  
+  // textareaが編集されるたびに保存（軽量）
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, textarea.value);
+    } catch(e) {}
+  }
+  
+  function loadDraft() {
+    try {
+      return localStorage.getItem(DRAFT_KEY) || "";
+    } catch(e) {
+      return "";
+    }
+  }
+  
+  // 入力のたびに保存
+  textarea.addEventListener("input", saveDraft);
+  
   if(textParam){
     textarea.value=textParam;
   }else if(sharedTitle || sharedText){
@@ -187,6 +208,13 @@ function openExternal(app, url, textToCopy){
     }
     textarea.value=combined;
   }
+
+  // ★共有テキストが無い時だけ、前回の下書きを復元
+  if(!textParam && !(sharedTitle || sharedText)) {
+    const draft = loadDraft();
+    if(draft) textarea.value = draft;
+  }
+    
   if(sharedUrl){
     urlInput.value=sharedUrl;
   }
@@ -440,6 +468,9 @@ function openExternal(app, url, textToCopy){
   }
 
   document.getElementById("showSNS").onclick = () => {
+
+    saveDraft(); 
+    
     // ③のタイミングで下書き保存（ネイティブ側に保持）
     if (window.Android && Android.saveDraft) {
       Android.saveDraft(textarea.value);
