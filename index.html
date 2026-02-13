@@ -440,15 +440,21 @@ function openExternal(app, url, textToCopy){
   }
 
   document.getElementById("showSNS").onclick = () => {
-    applySnsVisibilityByCurrentText();
-
-    // ここで必ずコピー（PCでも便利）
-    const text = textarea.value || "";
-    navigator.clipboard.writeText(text).catch(()=>{});
-
+    // ③のタイミングで下書き保存（ネイティブ側に保持）
+    if (window.Android && Android.saveDraft) {
+      Android.saveDraft(textarea.value);
+    }
+  
+    // クリップボードコピー等、既存処理
+    if (window.Android && Android.copyToClipboard) {
+      Android.copyToClipboard(textarea.value);
+    } else {
+      navigator.clipboard.writeText(textarea.value).catch(()=>{});
+    }
+  
     document.getElementById("snsButtons").style.display="block";
   };
-
+    
   /* -----------------------------
      SNS起動：Androidアプリ内なら外部アプリ優先
      それ以外は従来通り window.open
