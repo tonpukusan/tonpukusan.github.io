@@ -367,6 +367,12 @@ function isAndroidApp(){
   function generateAmazonLink(url){
     if(!isAmazon(url)) return null;
 
+    // amzn.to / amzn.asia は短縮（既にアフィリ化済みの可能性が高い）
+    // → ここで tag 付与/上書きをしない（成果が不安定 & 余計なパラメータ付与を避ける）
+    if (/^https?:\/\/amzn\.(to|asia)\//i.test(url)) {
+      return url; // そのまま使う
+    }
+    
     // ASIN抽出（dp/gp/product）
     let asinMatch =
       url.match(/\/dp\/([A-Z0-9]{10})/i) ||
@@ -414,7 +420,10 @@ function isAndroidApp(){
 
     if(isAmazon(url)){
       let aff = generateAmazonLink(url) || url;
-      aff = overwriteAmazonTagToMine(aff);
+      // amzn.to / amzn.asia は tag 上書きしない
+      if (!/^https?:\/\/amzn\.(to|asia)\//i.test(aff)) {
+        aff = overwriteAmazonTagToMine(aff);
+      }
       return "#密林偵察 #Amazonセール情報 #PR\n" + mid + aff;
     }
 
