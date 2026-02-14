@@ -454,15 +454,22 @@ function hasTag(text, tag){
     // 1) amzn.to は追跡しない＆いじらない（要件）
     if(isAmznShort(originalUrl) && /^https?:\/\/amzn\.to\//i.test(originalUrl)) return originalUrl;
 
-    // 2) amzn.asia は「既に自分tagの短縮」前提で追跡不要（要件）
-    if(isAmznShort(originalUrl) && /^https?:\/\/amzn\.asia\//i.test(originalUrl)) return originalUrl;
-
+    // amzn.to は追跡しない＆いじらない（要件）
+    if(/^https?:\/\/amzn\.to\//i.test(originalUrl)) return originalUrl;
+    
     // 3) amazon.asia / amzn.asia / amazon.asia は解決してから
     let url = originalUrl;
-    if(isAmazonAsiaDomain(url)){
-      url = await resolveUrlByAndroid(url);
+    if(isAmazonAsiaDomain(originalUrl)){
+      const resolved = await resolveUrlByAndroid(originalUrl);
+    
+      // 解決不能（または同一のまま）なら警告
+      if((resolved || "") === originalUrl){
+        alert("短縮URLを解決できませんでした（amzn.asia / amazon.asia）。そのまま投稿文に残します。");
+        return originalUrl;
+      }
+      url = resolved;
     }
-
+    
     // 4) 解決後に amazon.co.jp なら正規化＆tag付与
     if(isAmazonCoJp(url)){
       return normalizeAmazonCoJp(url);
