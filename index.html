@@ -12,12 +12,8 @@
     padding:14px;
     background:#fff;
   }
-  .container{
-    max-width:600px;
-    margin:auto;
-  }
+  .container{ max-width:600px; margin:auto; }
 
-  /* ====== ヘッダー（コンパクト） ====== */
   .topbar{
     display:flex;
     align-items:center;
@@ -25,10 +21,7 @@
     gap:10px;
     margin-bottom:10px;
   }
-  .topbar h2{
-    margin:0;
-    font-size:1.05rem;
-  }
+  .topbar h2{ margin:0; font-size:1.05rem; }
   .icon-btn{
     width:auto;
     padding:6px 10px;
@@ -39,7 +32,6 @@
     cursor:pointer;
   }
 
-  /* ====== 折り畳み（詳細） ====== */
   details.advanced{
     border:1px solid #ddd;
     border-radius:10px;
@@ -47,11 +39,7 @@
     margin-bottom:10px;
     background:#fff;
   }
-  details.advanced summary{
-    cursor:pointer;
-    font-size:.95rem;
-    color:#333;
-  }
+  details.advanced summary{ cursor:pointer; font-size:.95rem; color:#333; }
 
   textarea,input[type="text"]{
     width:100%;
@@ -60,11 +48,8 @@
     margin:10px 0;
     box-sizing:border-box;
   }
-  textarea{
-    height:120px;
-  }
+  textarea{ height:120px; }
 
-  /* ====== ボタン（小さめ） ====== */
   button{
     padding:10px 12px;
     margin:6px 0;
@@ -75,22 +60,10 @@
     border:1px solid #ddd;
     background:#fff;
   }
-  .btn-small{
-    padding:8px 10px;
-    font-size:.95rem;
-  }
-  .btn-primary{
-    font-weight:700;
-    border-color:#bbb;
-    background:#f3f3f3;
-  }
-  .btn-danger{
-    background:#ff4d4d;
-    color:#fff;
-    border-color:#ff4d4d;
-  }
+  .btn-small{ padding:8px 10px; font-size:.95rem; }
+  .btn-primary{ font-weight:700; border-color:#bbb; background:#f3f3f3; }
+  .btn-danger{ background:#ff4d4d; color:#fff; border-color:#ff4d4d; }
 
-  /* ====== 画像ボックス（低め） ====== */
   .image-box{
     border:1px solid #ccc;
     border-radius:10px;
@@ -102,14 +75,8 @@
     overflow:auto;
     box-sizing:border-box;
   }
-  .image-box img{
-    max-width:100%;
-    height:auto;
-    display:block;
-    margin-bottom:6px;
-  }
+  .image-box img{ max-width:100%; height:auto; display:block; margin-bottom:6px; }
 
-  /* ====== 下部sticky操作バー ====== */
   .actionbar{
     position:sticky;
     bottom:0;
@@ -124,17 +91,13 @@
     gap:8px;
     align-items:stretch;
   }
-  .actionbar .row + .row{
-    margin-top:8px;
-  }
+  .actionbar .row + .row{ margin-top:8px; }
 
-  /* SNSボタンを2列グリッド化 */
-  #snsButtons{
-    display:none;
-  }
+  /* SNSボタンは最初から表示 */
+  #snsButtons{ display:block; margin-top:10px; }
   .sns-grid{
     display:grid;
-    grid-template-columns: 1fr 1fr; /* 2列 */
+    grid-template-columns: 1fr 1fr;
     gap:8px;
   }
   .sns-btn{
@@ -145,7 +108,6 @@
     border-radius:12px;
   }
 
-  /* stickyが本文に被らない保険 */
   body{ padding-bottom:180px; }
 </style>
 </head>
@@ -158,14 +120,11 @@
     <button id="helpBtn" class="icon-btn" type="button">ⓘ</button>
   </div>
 
-  <!-- 詳細は折り畳み -->
   <details class="advanced" id="advancedBox">
     <summary>詳細</summary>
 
     <input type="text" id="urlInput" placeholder="URLだけ貼る（保険）">
-
     <button id="readClipboard" class="btn-small" style="display:none;">クリップボードから読み込む</button>
-
   </details>
 
   <button id="generate" class="btn-small">投稿文を生成</button>
@@ -176,22 +135,17 @@
     画像をペースト（Ctrl+V）またはドラッグ＆ドロップ（任意）
   </div>
 
-  <!-- 下部sticky操作バー（投稿・クリア・閉じる＋SNS） -->
   <div class="actionbar">
     <div class="row">
-      <button id="showSNS" class="btn-primary">投稿</button>
       <button id="clearDraft" style="display:none;background:#eee;">下書きクリア</button>
-    </div>
-
-    <div class="row">
       <button id="closeAll" class="btn-danger">すべて閉じる</button>
-      <!-- 右側は空き：将来用 -->
-      <button type="button" style="visibility:hidden;">.</button>
     </div>
 
+    <!-- SNSボタンは常時表示 -->
     <div id="snsButtons">
       <div class="sns-grid">
         <button class="sns-btn" id="btnX">X</button>
+        <button class="sns-btn" id="btnInstagram">Instagram</button>
         <button class="sns-btn" id="btnThreads">Threads</button>
         <button class="sns-btn" id="btnBsky">Bluesky</button>
         <button class="sns-btn" id="btnFb">Facebook</button>
@@ -205,83 +159,51 @@
 /* =============================
    共通判定ユーティリティ
 ============================= */
-function extractFirstUrl(text){
-  return text.match(/https?:\/\/[^\s]+/i)?.[0] || "";
-}
+const AMAZON_TAG = "yusatosh-22";
 
+// X用 ValueCommerce sid/pid（現状）
+const VC_SID_X = "3672888";
+const VC_PID_X = "888362937";
+
+// Instagram用 sid/pid は未確定なので仮（コメントアウトで後で差し替え）
+// const VC_SID_IG = "YOUR_INSTAGRAM_SID";
+// const VC_PID_IG = "YOUR_INSTAGRAM_PID";
+
+function extractFirstUrl(text){
+  return (text || "").match(/https?:\/\/[^\s]+/i)?.[0] || "";
+}
 function isValueCommerce(url){
   return !!url && url.includes("ck.jp.ap.valuecommerce.com/servlet/");
 }
-
 function hasAmazonTag(url){
   return /[?&]tag=/.test(url);
 }
-
 function hasRakutenAff(url){
   return url.includes("rafcid=") ||
          url.includes("scid=af_") ||
          url.includes("hb.afl.rakuten.co.jp") ||
          url.includes("a.r10.to");
 }
-
 function isAmazon(url){
   return /amazon\.(co\.jp|jp|asia)/i.test(url) || /amzn\.(to|asia)/i.test(url);
 }
-
 function isRakuten(url){
   return /rakuten\.(co\.jp|ne\.jp)/i.test(url) || url.includes("a.r10.to") || url.includes("hb.afl.rakuten.co.jp");
 }
-
 function isYahoo(url){
   return url.includes("shopping.yahoo.co.jp") ||
          url.includes("store.shopping.yahoo.co.jp") ||
          url.includes("yahoo.jp/");
 }
-
-/* =============================
-   Android側で短縮URLを解決（A方式用）
-   - Android Bridge: Android.resolveUrlAsync(url, reqId)
-   - コールバック: window.__posthubResolveCallback(reqId, resolvedUrl)
-============================= */
-function canResolveByAndroid(){
-  return typeof window.Android !== "undefined" &&
-         typeof window.Android.resolveUrlAsync === "function";
-}
-
-function resolveUrlByAndroid(url){
-  // 失敗時は元URLにフォールバックする
-  return new Promise((resolve) => {
-    if(!canResolveByAndroid()) return resolve(url);
-
-    const reqId = "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-
-    // dispatch用のテーブル
-    window.__posthubResolveDispatch = window.__posthubResolveDispatch || {};
-
-    // コールバック（dispatch）
-    window.__posthubResolveCallback = function(id, resolved){
-      try{
-        const fn = window.__posthubResolveDispatch && window.__posthubResolveDispatch[id];
-        if(fn) fn(resolved);
-      }catch(e){}
-    };
-
-    window.__posthubResolveDispatch[reqId] = (resolved) => {
-      delete window.__posthubResolveDispatch[reqId];
-      resolve(resolved || url);
-    };
-
-    try{
-      window.Android.resolveUrlAsync(url, reqId);
-    }catch(e){
-      resolve(url);
-    }
-  });
+function isBlogUrl(url){
+  if(!url) return false;
+  return url.startsWith("https://www.small-fishing.com/") ||
+         url.startsWith("https://tonpuku3fishing.blogspot.com") ||
+         url.startsWith("https://fishingtonpuku.blogspot.com/");
 }
 
 /**
  * Androidアプリ(WebView)内か判定：
- * いまの Android 側 Bridge に合わせて判定する
  *  - copyToClipboard / saveDraft / clearDraft があるか
  */
 function isAndroidApp(){
@@ -291,75 +213,13 @@ function isAndroidApp(){
          typeof window.Android.clearDraft === "function";
 }
 
+function hasTag(text, tag){
+  return new RegExp("(^|\\s)" + tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)", "m").test(text || "");
+}
+
 /* =============================
-   Amazon: A方式（あなたの仕様）
-   - amzn.to：既に自分tag前提 → 追跡/加工しない
-   - amzn.asia / amazon.asia：Androidで解決 → dp/ASIN正規化 → tagを自分にset（上書き）
-   - amazon.co.jp：dp/ASIN正規化（できる限り） → tagを自分にset（上書き）
+   初期化
 ============================= */
-const MY_AMAZON_TAG = "yusatosh-22";
-
-function getHost(url){
-  try { return new URL(url).host.toLowerCase(); } catch(e){ return ""; }
-}
-function isAmznTo(url){
-  return getHost(url) === "amzn.to";
-}
-function isAmazonCoJp(url){
-  const h = getHost(url);
-  return h.endsWith("amazon.co.jp");
-}
-function isAmazonAsia(url){
-  const h = getHost(url);
-  return h === "amzn.asia" || h.endsWith("amazon.asia");
-}
-function extractAmazonAsin(url){
-  const m =
-    url.match(/\/dp\/([A-Z0-9]{10})/i) ||
-    url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
-  return m ? m[1].toUpperCase() : "";
-}
-function normalizeAmazonToDp(url){
-  const asin = extractAmazonAsin(url);
-  if(!asin) return url;
-  return "https://www.amazon.co.jp/dp/" + asin;
-}
-function setAmazonTag(url){
-  // A）amazon.co.jpは tag を必ず自分に上書き（setなので重複しない）
-  try{
-    const u = new URL(url);
-    u.searchParams.set("tag", MY_AMAZON_TAG);
-    return u.toString();
-  }catch(e){
-    return url;
-  }
-}
-async function buildAmazonAffiliateUrl(inputUrl){
-  if(!inputUrl) return inputUrl;
-
-  // 1) amzn.to は “既に自分tag” 前提なので触らない
-  if(isAmznTo(inputUrl)){
-    return inputUrl;
-  }
-
-  // 2) amazon.asia / amzn.asia はAndroidで解決→正規化→tag付与
-  if(isAmazonAsia(inputUrl)){
-    const resolved = await resolveUrlByAndroid(inputUrl);
-    const normalized = normalizeAmazonToDp(resolved);
-    // 解決後がamazon.co.jp以外でも tag は set する（URLパースできない等はそのまま）
-    return setAmazonTag(normalized);
-  }
-
-  // 3) amazon.co.jp は正規化→tag付与（上書き）
-  if(isAmazonCoJp(inputUrl)){
-    const normalized = normalizeAmazonToDp(inputUrl);
-    return setAmazonTag(normalized);
-  }
-
-  // その他amazonドメインは保守的にそのまま
-  return inputUrl;
-}
-
 (function(){
   let winX=null, winThreads=null, winBsky=null, winFb=null;
 
@@ -370,35 +230,23 @@ async function buildAmazonAffiliateUrl(inputUrl){
   const isAndroid = /Android/.test(navigator.userAgent);
   const inAndroidApp = isAndroidApp();
 
-  /* -----------------------------
-     ヘルプ（説明文は排除し、ⓘに集約）
-  ----------------------------- */
+  // ヘルプ
   const helpBtn = document.getElementById("helpBtn");
   if(helpBtn){
     helpBtn.addEventListener("click", () => {
       alert(
         "使い方：\n" +
         "1) 共有→本文が入る\n" +
-        "2) 必要なら追記して「投稿」\n" +
-        "3) 各SNSを押して貼り付け（本文はコピーされます）\n\n" +
-        "詳細（URL入力/クリップボード読込）は必要な時だけ開いてください。"
+        "2) 必要なら追記して「投稿文を生成」（URLだけ整形/タグ付与）\n" +
+        "3) SNSボタンを押すと本文がコピー＆下書き保存されます\n" +
+        "4) 各SNS側で貼り付け\n\n" +
+        "ValueCommerceリンクは投稿先に制限があります。"
       );
     });
   }
 
-  /* -----------------------------
-     URLパラメータ（PCブックマークレット／Androidアプリからの ?text=）
-  ----------------------------- */
-  const params=new URLSearchParams(location.search);
-  const textParam=params.get("text")||"";
-  const sharedUrl=params.get("url")||"";
-  const sharedText=params.get("text")||"";
-  const sharedTitle=params.get("title")||"";
-
-  // ===== 下書き（Web: localStorage / Android: SharedPreferences）=====
-  // 仕様：B方式＝「投稿」ボタン押下時のみ保存
-  const DRAFT_KEY = "posthub_draft_v2";
-
+  // 下書き（Webのみ localStorage）
+  const DRAFT_KEY = "posthub_draft_v3";
   function saveDraftWeb(text){
     try { localStorage.setItem(DRAFT_KEY, text); } catch(e) {}
   }
@@ -409,16 +257,19 @@ async function buildAmazonAffiliateUrl(inputUrl){
     try { localStorage.removeItem(DRAFT_KEY); } catch(e) {}
   }
 
-  // 初期表示：優先順位
-  // 1) textParam（新しい共有が来た）
-  // 2) sharedTitle/sharedText（PC用パラメータが来た）
-  // 3) （Webのみ）localStorageの下書き
+  // URLパラメータ
+  const params=new URLSearchParams(location.search);
+  const textParam=params.get("text")||"";
+  const sharedUrl=params.get("url")||"";
+  const sharedText=params.get("text")||"";
+  const sharedTitle=params.get("title")||"";
+
+  // 初期表示
   (function initTextarea(){
     if(textParam){
       textarea.value = textParam;
       return;
     }
-
     if(sharedTitle || sharedText){
       let combined="";
       if(sharedTitle) combined+=sharedTitle;
@@ -429,7 +280,6 @@ async function buildAmazonAffiliateUrl(inputUrl){
       textarea.value=combined;
       return;
     }
-
     if(!inAndroidApp){
       const d = loadDraftWeb();
       if(d) textarea.value = d;
@@ -440,9 +290,70 @@ async function buildAmazonAffiliateUrl(inputUrl){
     urlInput.value=sharedUrl;
   }
 
-  /* -----------------------------
-     Amazonタイトル整形（必要なら）
-  ----------------------------- */
+  // Androidでは「すべて閉じる」を隠す
+  if (isAndroid) {
+    const closeBtn = document.getElementById("closeAll");
+    if (closeBtn) closeBtn.style.display = "none";
+  }
+
+  // Androidだけ「下書きクリア」を表示
+  const clearBtn = document.getElementById("clearDraft");
+  if (isAndroid && clearBtn) {
+    clearBtn.style.display = "block";
+    clearBtn.addEventListener("click", () => {
+      textarea.value = "";
+      urlInput.value = "";
+
+      if(inAndroidApp){
+        try { window.Android.clearDraft(); } catch(e){}
+      }else{
+        clearDraftWeb();
+      }
+      alert("下書きをクリアしました");
+    });
+  }
+
+  /* =============================
+     クリップボード読み込み
+     - Androidアプリ内：Android.readClipboard()
+     - Web：navigator.clipboard.readText()
+  ============================= */
+  if (isAndroid) {
+    const readBtn = document.getElementById("readClipboard");
+    if(readBtn) readBtn.style.display = "block";
+  }
+
+  const readClipboardBtn = document.getElementById("readClipboard");
+  if(readClipboardBtn){
+    readClipboardBtn.addEventListener("click", async () => {
+      // Android WebView優先
+      if(inAndroidApp && typeof window.Android.readClipboard === "function"){
+        try{
+          const t = window.Android.readClipboard() || "";
+          textarea.value = t;
+          return;
+        }catch(e){
+          // fallthrough
+        }
+      }
+
+      // Web fallback
+      try{
+        const t = await navigator.clipboard.readText();
+        textarea.value = t || "";
+      }catch(e){
+        alert(
+          "クリップボードを読み取れませんでした。\n" +
+          "原因：ブラウザ/OSの制限で readText が拒否されることがあります。\n" +
+          "対策：Androidアプリ内では readClipboard を使う構成にしています。"
+        );
+      }
+    });
+  }
+
+  /* =============================
+     生成用：Amazon/Rakuten/Yahoo
+============================= */
   function cleanAmazonTitle(title){
     if(!title) return "";
     title = title.replace(/^Amazon\s*\|\s*/i, "");
@@ -456,110 +367,334 @@ async function buildAmazonAffiliateUrl(inputUrl){
     return product;
   }
 
-  /* -----------------------------
-     楽天/Yahoo リンク生成
-  ----------------------------- */
+  function overwriteAmazonTagToMine(url){
+    try{
+      const u = new URL(url);
+      u.searchParams.set("tag", AMAZON_TAG);
+      return u.toString();
+    }catch(e){
+      return url;
+    }
+  }
+
+  function generateAmazonLink(url){
+    if(!isAmazon(url)) return null;
+
+    // amzn.to / amzn.asia は「既にあなたのtagの短縮」との前提なので追跡しない
+    if (/^https?:\/\/amzn\.(to|asia)\//i.test(url)) return url;
+
+    // dp / gp/product からASIN
+    let asinMatch =
+      url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+      url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+
+    if(asinMatch){
+      return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=" + AMAZON_TAG;
+    }
+
+    // それ以外は tag 付与（完全な正規化はしない）
+    if(hasAmazonTag(url)) return overwriteAmazonTagToMine(url);
+    return overwriteAmazonTagToMine(url + (url.includes("?") ? "&" : "?") + "tag=" + AMAZON_TAG);
+  }
+
   function generateRakutenLink(url){
     if(!isRakuten(url)) return null;
-
     if(hasRakutenAff(url)) return url;
-
     return url + (url.includes("?") ? "&" : "?") +
            "scid=af_pc_etc&rafcid=15844848.ec827d24.15844849.84443345";
   }
 
   function generateYahooLink(url){
     if(url.includes("yahoo.jp/")) return url;
-
     if(url.includes("store.shopping.yahoo.co.jp") || url.includes("shopping.yahoo.co.jp")){
       return "https://ck.jp.ap.valuecommerce.com/servlet/referral" +
-        "?sid=3672888&pid=888362937&vc_url=" + encodeURIComponent(url);
+        "?sid=" + VC_SID_X + "&pid=" + VC_PID_X + "&vc_url=" + encodeURIComponent(url);
     }
     return null;
   }
 
-  /* -----------------------------
-     投稿文生成（Amazonは非同期）
-  ----------------------------- */
-  async function generateFromURL(url, rawTitle){
-    if(!url) return "";
-
-    const mid = rawTitle ? (rawTitle + "\n\n") : "";
-
-    if(isAmazon(url)){
-      const aff = await buildAmazonAffiliateUrl(url);
-      return "#密林偵察 #Amazonセール情報 #PR\n" + mid + aff;
-    }
-
-    if(isRakuten(url)){
-      const aff = generateRakutenLink(url) || url;
-      return "#楽天偵察 #PR\n" + mid + aff;
-    }
-
-    if(isYahoo(url)){
-      const aff = generateYahooLink(url) || url;
-      return "#Yahoo偵察 #PR\n" + mid + aff;
-    }
-
-    return rawTitle ? (rawTitle + "\n" + url) : url;
+  // 本文中の「最初のURLだけ」置換（仕様：最初のURLが投稿対象）
+  function replaceFirstUrl(text, newUrl){
+    return (text || "").replace(/https?:\/\/[^\s]+/i, newUrl);
   }
 
-  /* -----------------------------
-     投稿文生成ボタン（async化）
-  ----------------------------- */
-  document.getElementById("generate").onclick = async () => {
-    const raw = textarea.value || "";
-    let url = extractFirstUrl(raw);
-    let title = "";
+  /* =============================
+     「投稿文を生成」：本文は消さない
+     - 既存本文は保持
+     - 先頭に必要なハッシュタグだけ追加（重複しない）
+     - 最初のURLだけアフィリ化して差し替え
+============================= */
+  function buildRequiredTags(url){
+    const tags = [];
 
-    if(raw.trim()){
-      const firstLine = raw.split("\n")[0].trim();
-      title = firstLine.replace(/https?:\/\/[^\s]+/g, "").trim();
-      if(url && isAmazon(url)) title = cleanAmazonTitle(title);
-      title = title.replace(/^\[楽天\]\s*/i, "");
+    // ブログなら追加
+    if(isBlogUrl(url)) tags.push("#ブログ過去記事");
+
+    if(isAmazon(url)){
+      tags.push("#密林偵察", "#Amazonセール情報", "#PR");
+    }else if(isRakuten(url)){
+      tags.push("#楽天偵察", "#PR");
+    }else if(isYahoo(url)){
+      tags.push("#Yahoo偵察", "#PR");
     }
 
+    return tags;
+  }
+
+  function applyTagsPreservingBody(originalText, tags){
+    let t = originalText || "";
+    // 既に入っていないものだけを「先頭にまとめて1行」で追加
+    const missing = tags.filter(tag => !hasTag(t, tag));
+    if(missing.length === 0) return t;
+
+    // 先頭に追加（既存本文はそのまま下へ）
+    return missing.join(" ") + "\n" + t;
+  }
+
+  document.getElementById("generate").onclick = () => {
+    let raw = textarea.value || "";
+    let url = extractFirstUrl(raw);
     if(!url) url = (urlInput.value || "").trim();
     if(!url) return;
 
-    textarea.value = await generateFromURL(url, title);
-    applySnsVisibilityByCurrentText();
+    // タイトル整形（Amazonのみ）：本文の1行目からURL抜いて軽く整形したい場合だけ
+    // ただし「本文を消さない」が優先なので、ここでは本文の文字列は基本触らない
+
+    // URLをアフィリ化（最初のURLのみ差し替え）
+    let affUrl = url;
+
+    if(isAmazon(url)){
+      affUrl = generateAmazonLink(url) || url;
+      // amzn.to/asia は上書きしない
+      if(!/^https?:\/\/amzn\.(to|asia)\//i.test(affUrl)){
+        affUrl = overwriteAmazonTagToMine(affUrl);
+      }
+    }else if(isRakuten(url)){
+      affUrl = generateRakutenLink(url) || url;
+    }else if(isYahoo(url)){
+      affUrl = generateYahooLink(url) || url;
+    }
+
+    if(affUrl && affUrl !== url){
+      raw = replaceFirstUrl(raw, affUrl);
+    }
+
+    // 必要タグを「足りない分だけ」付与（本文は残す）
+    const tags = buildRequiredTags(url);
+    raw = applyTagsPreservingBody(raw, tags);
+
+    textarea.value = raw;
   };
 
-  /* -----------------------------
-     Pinterest ボタン表示制御（現状維持）
-  ----------------------------- */
-  function updatePinterestButtonVisibility(){
-    const text = textarea.value.trim();
+  /* =============================
+     VC制限：X/Instagram以外はNG
+============================= */
+  function guardValueCommerceOrAlert(targetSnsName){
+    const text = textarea.value || "";
     const url = extractFirstUrl(text);
-    const btn = document.getElementById("btnPinterest");
+    const isVC = isValueCommerce(url);
 
-    if(!btn) return;
+    if(!isVC) return {ok:true, url, text};
 
-    if(!url){
-      btn.style.display="none";
-      return;
+    // VCは X と Instagram 以外NG
+    const allow = (targetSnsName === "x" || targetSnsName === "instagram");
+    if(!allow){
+      alert("ValueCommerceのURLはこのSNSでは投稿できません。");
+      return {ok:false, url, text};
     }
-
-    const isBlogger =
-      url.includes("small-fishing.com") ||
-      url.includes("fishingtonpuku.blogspot.com") ||
-      url.includes("tonpuku3fishing.blogspot.com");
-
-    if(isRakuten(url) || isBlogger){
-      btn.style.display="block";
-    }else{
-      btn.style.display="none";
-    }
+    return {ok:true, url, text};
   }
 
-  textarea.addEventListener("input", () => {
-    updatePinterestButtonVisibility();
-  });
+  // Instagram用 VC sid/pid差し替え（未確定なので仮：コメントアウト実装）
+  function replaceVcSidPidForInstagramIfNeeded(text){
+    const url = extractFirstUrl(text);
+    if(!isValueCommerce(url)) return text;
 
-  /* -----------------------------
+    // sid/pid 置換先が未確定なので、ここは後で有効化してください
+    // try{
+    //   const u = new URL(url);
+    //   if(u.searchParams.get("sid") === VC_SID_X) u.searchParams.set("sid", VC_SID_IG);
+    //   if(u.searchParams.get("pid") === VC_PID_X) u.searchParams.set("pid", VC_PID_IG);
+    //   const replaced = u.toString();
+    //   return replaceFirstUrl(text, replaced);
+    // }catch(e){
+    //   return text;
+    // }
+
+    return text;
+  }
+
+  /* =============================
+     SNSボタン押下時の共通処理
+     - VC制限チェック
+     - （Instagramのみ）VC sid/pid差し替え（仮）
+     - クリップボードコピー
+     - 下書き保存（Android:saveDraft / Web:localStorage）
+============================= */
+  function backupAndCopy(textToCopy){
+    // 下書き保存
+    if(inAndroidApp){
+      try{ window.Android.saveDraft(textToCopy); }catch(e){}
+    }else{
+      saveDraftWeb(textToCopy);
+    }
+
+    // クリップボードへ
+    if(inAndroidApp){
+      try{ window.Android.copyToClipboard(textToCopy); return; }catch(e){}
+    }
+    navigator.clipboard.writeText(textToCopy).catch(()=>{});
+  }
+
+  function openOrPopup(url, winRefName){
+    if(inAndroidApp){
+      // 外部へ（WebViewClientが外に出す）
+      location.href = url;
+      return;
+    }
+    let w = null;
+    if(winRefName === "X") w = winX;
+    if(winRefName === "IG") w = null; // IGはweb fallbackしない（起動だけの想定）
+    if(winRefName === "TH") w = winThreads;
+    if(winRefName === "BSKY") w = winBsky;
+    if(winRefName === "FB") w = winFb;
+
+    if(!w || w.closed){
+      w = window.open(url, "SNS_" + winRefName);
+    }else{
+      try{ w.location.href = url; w.focus(); }
+      catch(e){ w.close(); w = window.open(url, "SNS_" + winRefName); }
+    }
+
+    if(winRefName === "X") winX = w;
+    if(winRefName === "TH") winThreads = w;
+    if(winRefName === "BSKY") winBsky = w;
+    if(winRefName === "FB") winFb = w;
+  }
+
+  // X
+  const btnX = document.getElementById("btnX");
+  if(btnX){
+    btnX.onclick = () => {
+      const g = guardValueCommerceOrAlert("x");
+      if(!g.ok) return;
+
+      const text = textarea.value || "";
+      backupAndCopy(text);
+
+      const url = "https://x.com/intent/post?text=" + encodeURIComponent(text);
+      openOrPopup(url, "X");
+    };
+  }
+
+  // Instagram（A方式：コピーしてアプリ/ブラウザを開くだけ）
+  const btnIG = document.getElementById("btnInstagram");
+  if(btnIG){
+    btnIG.onclick = () => {
+      const g = guardValueCommerceOrAlert("instagram");
+      if(!g.ok) return;
+
+      // VCなら sid/pid を差し替える必要がある（未確定のため仮）
+      let text = textarea.value || "";
+      text = replaceVcSidPidForInstagramIfNeeded(text);
+
+      backupAndCopy(text);
+
+      // アプリ起動（WebViewClientが外に出す / Webならwebが開く）
+      openOrPopup("https://www.instagram.com/", "IG");
+    };
+  }
+
+  // Threads（VCはNG）
+  const btnThreads = document.getElementById("btnThreads");
+  if(btnThreads){
+    btnThreads.onclick = () => {
+      const g = guardValueCommerceOrAlert("threads");
+      if(!g.ok) return;
+
+      const text = textarea.value || "";
+      backupAndCopy(text);
+
+      openOrPopup("https://www.threads.net/intent/post", "TH");
+    };
+  }
+
+  // Bluesky（VCはNG）
+  const btnB = document.getElementById("btnBsky");
+  if(btnB){
+    btnB.onclick = () => {
+      const g = guardValueCommerceOrAlert("bsky");
+      if(!g.ok) return;
+
+      const text = textarea.value || "";
+      backupAndCopy(text);
+
+      openOrPopup("https://bsky.app", "BSKY");
+    };
+  }
+
+  // Facebook（VCはNG）
+  const btnF = document.getElementById("btnFb");
+  if(btnF){
+    btnF.onclick = () => {
+      const g = guardValueCommerceOrAlert("facebook");
+      if(!g.ok) return;
+
+      const text = textarea.value || "";
+      backupAndCopy(text);
+
+      openOrPopup("https://www.facebook.com/", "FB");
+    };
+  }
+
+  // Pinterest（VCはNG）
+  const btnP = document.getElementById("btnPinterest");
+  if(btnP){
+    btnP.onclick = () => {
+      const g = guardValueCommerceOrAlert("pinterest");
+      if(!g.ok) return;
+
+      const text = textarea.value.trim();
+      const url = extractFirstUrl(text);
+      if(!url) return;
+
+      backupAndCopy(text);
+
+      const pinterestUrl =
+        "https://www.pinterest.com/pin-builder/?" +
+        "url=" + encodeURIComponent(url) +
+        "&description=" + encodeURIComponent(text);
+
+      if(inAndroidApp){
+        location.href = pinterestUrl;
+        return;
+      }
+      window.open(pinterestUrl, "SNS_PINTEREST");
+    };
+  }
+
+  // 全SNSタブを閉じる（Webのみ）
+  function closeAll(){
+    [winX, winThreads, winBsky, winFb].forEach(w=>{
+      if(w && !w.closed) w.close();
+    });
+  }
+
+  const closeAllBtn = document.getElementById("closeAll");
+  if(closeAllBtn){
+    closeAllBtn.onclick = () => {
+      if(inAndroidApp) return;
+      closeAll();
+      window.close();
+    };
+  }
+  if(!inAndroidApp){
+    window.addEventListener("beforeunload", closeAll);
+  }
+
+  /* =============================
      画像ペースト／ドラッグ＆ドロップ
-  ----------------------------- */
+============================= */
   function handleImageFile(file){
     if(!file || !file.type.startsWith("image/")) return;
     const reader=new FileReader();
@@ -594,217 +729,6 @@ async function buildAmazonAffiliateUrl(inputUrl){
       for(const file of files) handleImageFile(file);
     });
   }
-
-  /* -----------------------------
-     Android向け readClipboard（任意）
-  ----------------------------- */
-  if (isAndroid) {
-    const readBtn = document.getElementById("readClipboard");
-    if(readBtn) readBtn.style.display = "block";
-  }
-
-  const readClipboardBtn = document.getElementById("readClipboard");
-  if(readClipboardBtn){
-    readClipboardBtn.addEventListener("click", () => {
-      navigator.clipboard.readText()
-        .then(text => { textarea.value = text || ""; applySnsVisibilityByCurrentText(); })
-        .catch(() => alert("クリップボードの読み取りが許可されていません"));
-    });
-  }
-
-  /* -----------------------------
-     Web/Androidでボタン表示を変える
-  ----------------------------- */
-  // Androidでは「すべて閉じる」を隠す
-  if (isAndroid) {
-    const closeBtn = document.getElementById("closeAll");
-    if (closeBtn) closeBtn.style.display = "none";
-  }
-
-  // Androidだけ「クリア」を表示
-  const clearBtn = document.getElementById("clearDraft");
-  if (isAndroid && clearBtn) {
-    clearBtn.style.display = "block";
-    clearBtn.addEventListener("click", () => {
-      textarea.value = "";
-      urlInput.value = "";
-      const sns = document.getElementById("snsButtons");
-      if(sns) sns.style.display = "none";
-
-      if(inAndroidApp){
-        try { window.Android.clearDraft(); } catch(e){}
-      }else{
-        clearDraftWeb();
-      }
-      applySnsVisibilityByCurrentText();
-      alert("下書きをクリアしました");
-    });
-  }
-
-  /* -----------------------------
-     SNSボタン表示制御
-     - ValueCommerceならX以外を隠す
-  ----------------------------- */
-  function applySnsVisibilityByCurrentText(){
-    const text = textarea.value || "";
-    const url = extractFirstUrl(text);
-
-    const isVC = url && isValueCommerce(url);
-
-    const t = document.getElementById("btnThreads");
-    const b = document.getElementById("btnBsky");
-    const f = document.getElementById("btnFb");
-    const p = document.getElementById("btnPinterest");
-
-    if(t) t.style.display="block";
-    if(b) b.style.display="block";
-    if(f) f.style.display="block";
-    if(p) p.style.display="block";
-
-    if(isVC){
-      if(t) t.style.display="none";
-      if(b) b.style.display="none";
-      if(f) f.style.display="none";
-      if(p) p.style.display="none";
-    }
-
-    updatePinterestButtonVisibility();
-  }
-
-  /* -----------------------------
-     「投稿」ボタン：B方式でここでだけ保存
-  ----------------------------- */
-  const showBtn = document.getElementById("showSNS");
-  if(showBtn){
-    showBtn.onclick = () => {
-      // 1) B方式：投稿ボタン押下時だけ保存
-      if(inAndroidApp){
-        try { window.Android.saveDraft(textarea.value); } catch(e){}
-      }else{
-        saveDraftWeb(textarea.value);
-      }
-
-      // 2) クリップボードへ（任意）
-      navigator.clipboard.writeText(textarea.value).catch(()=>{});
-
-      // 3) VCならボタン制限
-      applySnsVisibilityByCurrentText();
-
-      // 4) SNSボタン表示
-      const sns = document.getElementById("snsButtons");
-      if(sns) sns.style.display="block";
-    };
-  }
-
-  /* -----------------------------
-     SNS起動
-     - Androidアプリ内：コピーして location.href（WebViewClientが外に出す）
-     - Web：window.open
-  ----------------------------- */
-  function openOrPopup(url, winRefName){
-    if(inAndroidApp){
-      try{ window.Android.copyToClipboard(textarea.value); }catch(e){}
-      location.href = url;
-      return;
-    }
-
-    let w = null;
-    if(winRefName === "X") w = winX;
-    if(winRefName === "TH") w = winThreads;
-    if(winRefName === "BSKY") w = winBsky;
-    if(winRefName === "FB") w = winFb;
-
-    if(!w || w.closed){
-      w = window.open(url, "SNS_" + winRefName);
-    }else{
-      try{ w.location.href = url; w.focus(); }
-      catch(e){ w.close(); w = window.open(url, "SNS_" + winRefName); }
-    }
-
-    if(winRefName === "X") winX = w;
-    if(winRefName === "TH") winThreads = w;
-    if(winRefName === "BSKY") winBsky = w;
-    if(winRefName === "FB") winFb = w;
-  }
-
-  const btnX = document.getElementById("btnX");
-  if(btnX){
-    btnX.onclick = () => {
-      const text = textarea.value || "";
-      const url = "https://x.com/intent/post?text=" + encodeURIComponent(text);
-      openOrPopup(url, "X");
-    };
-  }
-
-  const btnThreads = document.getElementById("btnThreads");
-  if(btnThreads){
-    btnThreads.onclick = () => {
-      openOrPopup("https://www.threads.net/intent/post", "TH");
-    };
-  }
-
-  const btnB = document.getElementById("btnBsky");
-  if(btnB){
-    btnB.onclick = () => {
-      openOrPopup("https://bsky.app", "BSKY");
-    };
-  }
-
-  const btnF = document.getElementById("btnFb");
-  if(btnF){
-    btnF.onclick = () => {
-      openOrPopup("https://www.facebook.com/", "FB");
-    };
-  }
-
-  const btnP = document.getElementById("btnPinterest");
-  if(btnP){
-    btnP.onclick = () => {
-      const text = textarea.value.trim();
-      const url = extractFirstUrl(text);
-      if(!url) return;
-
-      const pinterestUrl =
-        "https://www.pinterest.com/pin-builder/?" +
-        "url=" + encodeURIComponent(url) +
-        "&description=" + encodeURIComponent(text);
-
-      if(inAndroidApp){
-        try{ window.Android.copyToClipboard(textarea.value); }catch(e){}
-        location.href = pinterestUrl;
-        return;
-      }
-
-      window.open(pinterestUrl, "SNS_PINTEREST");
-    };
-  }
-
-  /* -----------------------------
-     全SNSタブを閉じる（Web用のみ）
-  ----------------------------- */
-  function closeAll(){
-    [winX, winThreads, winBsky, winFb].forEach(w=>{
-      if(w && !w.closed) w.close();
-    });
-  }
-
-  const closeAllBtn = document.getElementById("closeAll");
-  if(closeAllBtn){
-    closeAllBtn.onclick = () => {
-      if(inAndroidApp){
-        return;
-      }
-      closeAll();
-      window.close();
-    };
-  }
-
-  if(!inAndroidApp){
-    window.addEventListener("beforeunload", closeAll);
-  }
-
-  // 初期反映
-  applySnsVisibilityByCurrentText();
 })();
 </script>
 
