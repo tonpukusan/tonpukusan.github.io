@@ -185,7 +185,7 @@
 
     <div class="row">
       <button id="closeAll" class="btn-danger">すべて閉じる</button>
-      <!-- 右側は空き：将来用（今は非表示にしないならダミー） -->
+      <!-- 右側は空き：将来用 -->
       <button type="button" style="visibility:hidden;">.</button>
     </div>
 
@@ -238,6 +238,47 @@ function isYahoo(url){
          url.includes("yahoo.jp/");
 }
 
+/* =============================
+   Android側で短縮URLを解決（A方式用）
+   - Android Bridge: Android.resolveUrlAsync(url, reqId)
+   - コールバック: window.__posthubResolveCallback(reqId, resolvedUrl)
+============================= */
+function canResolveByAndroid(){
+  return typeof window.Android !== "undefined" &&
+         typeof window.Android.resolveUrlAsync === "function";
+}
+
+function resolveUrlByAndroid(url){
+  // 失敗時は元URLにフォールバックする
+  return new Promise((resolve) => {
+    if(!canResolveByAndroid()) return resolve(url);
+
+    const reqId = "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+
+    // dispatch用のテーブル
+    window.__posthubResolveDispatch = window.__posthubResolveDispatch || {};
+
+    // コールバック（dispatch）
+    window.__posthubResolveCallback = function(id, resolved){
+      try{
+        const fn = window.__posthubResolveDispatch && window.__posthubResolveDispatch[id];
+        if(fn) fn(resolved);
+      }catch(e){}
+    };
+
+    window.__posthubResolveDispatch[reqId] = (resolved) => {
+      delete window.__posthubResolveDispatch[reqId];
+      resolve(resolved || url);
+    };
+
+    try{
+      window.Android.resolveUrlAsync(url, reqId);
+    }catch(e){
+      resolve(url);
+    }
+  });
+}
+
 /**
  * Androidアプリ(WebView)内か判定：
  * いまの Android 側 Bridge に合わせて判定する
@@ -248,6 +289,75 @@ function isAndroidApp(){
          typeof window.Android.copyToClipboard === "function" &&
          typeof window.Android.saveDraft === "function" &&
          typeof window.Android.clearDraft === "function";
+}
+
+/* =============================
+   Amazon: A方式（あなたの仕様）
+   - amzn.to：既に自分tag前提 → 追跡/加工しない
+   - amzn.asia / amazon.asia：Androidで解決 → dp/ASIN正規化 → tagを自分にset（上書き）
+   - amazon.co.jp：dp/ASIN正規化（できる限り） → tagを自分にset（上書き）
+============================= */
+const MY_AMAZON_TAG = "yusatosh-22";
+
+function getHost(url){
+  try { return new URL(url).host.toLowerCase(); } catch(e){ return ""; }
+}
+function isAmznTo(url){
+  return getHost(url) === "amzn.to";
+}
+function isAmazonCoJp(url){
+  const h = getHost(url);
+  return h.endsWith("amazon.co.jp");
+}
+function isAmazonAsia(url){
+  const h = getHost(url);
+  return h === "amzn.asia" || h.endsWith("amazon.asia");
+}
+function extractAmazonAsin(url){
+  const m =
+    url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+    url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+  return m ? m[1].toUpperCase() : "";
+}
+function normalizeAmazonToDp(url){
+  const asin = extractAmazonAsin(url);
+  if(!asin) return url;
+  return "https://www.amazon.co.jp/dp/" + asin;
+}
+function setAmazonTag(url){
+  // A）amazon.co.jpは tag を必ず自分に上書き（setなので重複しない）
+  try{
+    const u = new URL(url);
+    u.searchParams.set("tag", MY_AMAZON_TAG);
+    return u.toString();
+  }catch(e){
+    return url;
+  }
+}
+async function buildAmazonAffiliateUrl(inputUrl){
+  if(!inputUrl) return inputUrl;
+
+  // 1) amzn.to は “既に自分tag” 前提なので触らない
+  if(isAmznTo(inputUrl)){
+    return inputUrl;
+  }
+
+  // 2) amazon.asia / amzn.asia はAndroidで解決→正規化→tag付与
+  if(isAmazonAsia(inputUrl)){
+    const resolved = await resolveUrlByAndroid(inputUrl);
+    const normalized = normalizeAmazonToDp(resolved);
+    // 解決後がamazon.co.jp以外でも tag は set する（URLパースできない等はそのまま）
+    return setAmazonTag(normalized);
+  }
+
+  // 3) amazon.co.jp は正規化→tag付与（上書き）
+  if(isAmazonCoJp(inputUrl)){
+    const normalized = normalizeAmazonToDp(inputUrl);
+    return setAmazonTag(normalized);
+  }
+
+  // その他amazonドメインは保守的にそのまま
+  return inputUrl;
 }
 
 (function(){
@@ -287,7 +397,6 @@ function isAndroidApp(){
 
   // ===== 下書き（Web: localStorage / Android: SharedPreferences）=====
   // 仕様：B方式＝「投稿」ボタン押下時のみ保存
-  // Web版だけ保険で localStorage を使う（Androidアプリは saveDraft に寄せる）
   const DRAFT_KEY = "posthub_draft_v2";
 
   function saveDraftWeb(text){
@@ -304,7 +413,6 @@ function isAndroidApp(){
   // 1) textParam（新しい共有が来た）
   // 2) sharedTitle/sharedText（PC用パラメータが来た）
   // 3) （Webのみ）localStorageの下書き
-  // ※ Androidアプリは、起動時点で MainActivity が「下書き or 共有」を ?text= で渡してくる想定
   (function initTextarea(){
     if(textParam){
       textarea.value = textParam;
@@ -349,58 +457,18 @@ function isAndroidApp(){
   }
 
   /* -----------------------------
-     Amazonタグ上書き（要件⑤）
+     楽天/Yahoo リンク生成
   ----------------------------- */
-  function overwriteAmazonTagToMine(url){
-    try{
-      const u = new URL(url);
-      u.searchParams.set("tag", "yusatosh-22");
-      return u.toString();
-    }catch(e){
-      return url;
-    }
-  }
-
-  /* -----------------------------
-     アフィリンク生成
-  ----------------------------- */
-  function generateAmazonLink(url){
-    if(!isAmazon(url)) return null;
-
-    // amzn.to / amzn.asia は短縮（既にアフィリ化済みの可能性が高い）
-    // → ここで tag 付与/上書きをしない（成果が不安定 & 余計なパラメータ付与を避ける）
-    if (/^https?:\/\/amzn\.(to|asia)\//i.test(url)) {
-      return url; // そのまま使う
-    }
-    
-    // ASIN抽出（dp/gp/product）
-    let asinMatch =
-      url.match(/\/dp\/([A-Z0-9]{10})/i) ||
-      url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
-
-    if(asinMatch){
-      return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=yusatosh-22";
-    }
-
-    // amzn.asia/d/xxxxx は ASIN 断定できないので無理に変換しない（A-1）
-    // 最低限 tag を付ける（成果保証は弱い）
-    if(hasAmazonTag(url)) return overwriteAmazonTagToMine(url);
-    return overwriteAmazonTagToMine(url + (url.includes("?") ? "&" : "?") + "tag=yusatosh-22");
-  }
-
   function generateRakutenLink(url){
     if(!isRakuten(url)) return null;
 
-    // 既にアフィリならそのまま
     if(hasRakutenAff(url)) return url;
 
-    // A方式：scid/rafcid 付与
     return url + (url.includes("?") ? "&" : "?") +
            "scid=af_pc_etc&rafcid=15844848.ec827d24.15844849.84443345";
   }
 
   function generateYahooLink(url){
-    // Yahoo公式短縮リンクはそのまま
     if(url.includes("yahoo.jp/")) return url;
 
     if(url.includes("store.shopping.yahoo.co.jp") || url.includes("shopping.yahoo.co.jp")){
@@ -411,19 +479,15 @@ function isAndroidApp(){
   }
 
   /* -----------------------------
-     投稿文生成
+     投稿文生成（Amazonは非同期）
   ----------------------------- */
-  function generateFromURL(url, rawTitle){
+  async function generateFromURL(url, rawTitle){
     if(!url) return "";
 
     const mid = rawTitle ? (rawTitle + "\n\n") : "";
 
     if(isAmazon(url)){
-      let aff = generateAmazonLink(url) || url;
-      // amzn.to / amzn.asia は tag 上書きしない
-      if (!/^https?:\/\/amzn\.(to|asia)\//i.test(aff)) {
-        aff = overwriteAmazonTagToMine(aff);
-      }
+      const aff = await buildAmazonAffiliateUrl(url);
       return "#密林偵察 #Amazonセール情報 #PR\n" + mid + aff;
     }
 
@@ -437,14 +501,13 @@ function isAndroidApp(){
       return "#Yahoo偵察 #PR\n" + mid + aff;
     }
 
-    // 一般URL（ハッシュタグ無し）
     return rawTitle ? (rawTitle + "\n" + url) : url;
   }
 
   /* -----------------------------
-     投稿文生成ボタン
+     投稿文生成ボタン（async化）
   ----------------------------- */
-  document.getElementById("generate").onclick = () => {
+  document.getElementById("generate").onclick = async () => {
     const raw = textarea.value || "";
     let url = extractFirstUrl(raw);
     let title = "";
@@ -459,8 +522,7 @@ function isAndroidApp(){
     if(!url) url = (urlInput.value || "").trim();
     if(!url) return;
 
-    textarea.value = generateFromURL(url, title);
-
+    textarea.value = await generateFromURL(url, title);
     applySnsVisibilityByCurrentText();
   };
 
@@ -553,8 +615,7 @@ function isAndroidApp(){
   /* -----------------------------
      Web/Androidでボタン表示を変える
   ----------------------------- */
-
-  // Androidでは「すべて閉じる」を隠す（あなたの提案）
+  // Androidでは「すべて閉じる」を隠す
   if (isAndroid) {
     const closeBtn = document.getElementById("closeAll");
     if (closeBtn) closeBtn.style.display = "none";
@@ -639,7 +700,6 @@ function isAndroidApp(){
      SNS起動
      - Androidアプリ内：コピーして location.href（WebViewClientが外に出す）
      - Web：window.open
-     ※ 重要：いまのAndroid側には openApp が無いのでJSからは呼ばない
   ----------------------------- */
   function openOrPopup(url, winRefName){
     if(inAndroidApp){
