@@ -202,15 +202,78 @@ function isBlogUrl(url){
          url.startsWith("https://fishingtonpuku.blogspot.com/");
 }
 
-/**
- * Androidアプリ(WebView)内か判定：
- *  - copyToClipboard / saveDraft / clearDraft があるか
- */
+function isAmznShort(url){
+  return /^https?:\/\/amzn\.(to|asia)\//i.test(url || "");
+}
+function isAmazonAsiaDomain(url){
+  // 「amzn.asia」「amazon.asia」のみ追跡対象（要件）
+  try{
+    const u = new URL(url);
+    const h = (u.host || "").toLowerCase();
+    return h === "amzn.asia" || h.endsWith(".amzn.asia") || h === "amazon.asia" || h.endsWith(".amazon.asia");
+  }catch(e){
+    return false;
+  }
+}
+function isAmazonCoJp(url){
+  try{
+    const u = new URL(url);
+    const h = (u.host || "").toLowerCase();
+    return h === "www.amazon.co.jp" || h === "amazon.co.jp";
+  }catch(e){
+    return false;
+  }
+}
+function extractAsin(url){
+  if(!url) return "";
+  const m =
+    url.match(/\/dp\/([A-Z0-9]{10})/i) ||
+    url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+  return m ? m[1].toUpperCase() : "";
+}
+
 function isAndroidApp(){
   return typeof window.Android !== "undefined" &&
          typeof window.Android.copyToClipboard === "function" &&
          typeof window.Android.saveDraft === "function" &&
          typeof window.Android.clearDraft === "function";
+}
+
+/* =============================
+   A方式：Android側でURL解決（resolveUrlAsync）
+   - JS側で Promise 化して generate 時に使う
+============================= */
+function canResolveByAndroid(){
+  return typeof window.Android !== "undefined" &&
+         typeof window.Android.resolveUrlAsync === "function";
+}
+
+// Android側が呼ぶ：window.__posthubResolveCallback(reqId, resolvedUrl)
+window.__posthubResolveDispatch = window.__posthubResolveDispatch || {};
+window.__posthubResolveCallback = function(reqId, resolvedUrl){
+  const fn = window.__posthubResolveDispatch && window.__posthubResolveDispatch[reqId];
+  if(fn){
+    delete window.__posthubResolveDispatch[reqId];
+    fn(resolvedUrl || "");
+  }
+};
+
+function resolveUrlByAndroid(url){
+  return new Promise((resolve) => {
+    if(!canResolveByAndroid()) return resolve(url);
+
+    const reqId = "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+    window.__posthubResolveDispatch[reqId] = (resolved) => {
+      resolve(resolved || url);
+    };
+
+    try{
+      window.Android.resolveUrlAsync(url, reqId);
+    }catch(e){
+      delete window.__posthubResolveDispatch[reqId];
+      resolve(url);
+    }
+  });
 }
 
 function hasTag(text, tag){
@@ -237,7 +300,7 @@ function hasTag(text, tag){
       alert(
         "使い方：\n" +
         "1) 共有→本文が入る\n" +
-        "2) 必要なら追記して「投稿文を生成」（URLだけ整形/タグ付与）\n" +
+        "2) 必要なら追記して「投稿文を生成」（URL整形/タグ付与）\n" +
         "3) SNSボタンを押すと本文がコピー＆下書き保存されます\n" +
         "4) 各SNS側で貼り付け\n\n" +
         "ValueCommerceリンクは投稿先に制限があります。"
@@ -326,7 +389,6 @@ function hasTag(text, tag){
   const readClipboardBtn = document.getElementById("readClipboard");
   if(readClipboardBtn){
     readClipboardBtn.addEventListener("click", async () => {
-      // Android WebView優先
       if(inAndroidApp && typeof window.Android.readClipboard === "function"){
         try{
           const t = window.Android.readClipboard() || "";
@@ -336,8 +398,6 @@ function hasTag(text, tag){
           // fallthrough
         }
       }
-
-      // Web fallback
       try{
         const t = await navigator.clipboard.readText();
         textarea.value = t || "";
@@ -370,6 +430,7 @@ function hasTag(text, tag){
   function overwriteAmazonTagToMine(url){
     try{
       const u = new URL(url);
+      // 既にtagがあっても set なので重複しない（上書き）
       u.searchParams.set("tag", AMAZON_TAG);
       return u.toString();
     }catch(e){
@@ -377,24 +438,38 @@ function hasTag(text, tag){
     }
   }
 
-  function generateAmazonLink(url){
-    if(!isAmazon(url)) return null;
+  function normalizeAmazonCoJp(url){
+    // amazon.co.jp でASIN取れたら dp/ASIN?tag= に正規化
+    const asin = extractAsin(url);
+    if(asin){
+      return "https://www.amazon.co.jp/dp/" + asin + "?tag=" + AMAZON_TAG;
+    }
+    // ASIN取れないなら、そのURLにtagを set（重複しない）
+    return overwriteAmazonTagToMine(url);
+  }
 
-    // amzn.to / amzn.asia は「既にあなたのtagの短縮」との前提なので追跡しない
-    if (/^https?:\/\/amzn\.(to|asia)\//i.test(url)) return url;
+  async function generateAmazonAffiliateUrl(originalUrl){
+    if(!originalUrl) return originalUrl;
 
-    // dp / gp/product からASIN
-    let asinMatch =
-      url.match(/\/dp\/([A-Z0-9]{10})/i) ||
-      url.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+    // 1) amzn.to は追跡しない＆いじらない（要件）
+    if(isAmznShort(originalUrl) && /^https?:\/\/amzn\.to\//i.test(originalUrl)) return originalUrl;
 
-    if(asinMatch){
-      return "https://www.amazon.co.jp/dp/" + asinMatch[1] + "?tag=" + AMAZON_TAG;
+    // 2) amzn.asia は「既に自分tagの短縮」前提で追跡不要（要件）
+    if(isAmznShort(originalUrl) && /^https?:\/\/amzn\.asia\//i.test(originalUrl)) return originalUrl;
+
+    // 3) amazon.asia / amzn.asia / amazon.asia は解決してから
+    let url = originalUrl;
+    if(isAmazonAsiaDomain(url)){
+      url = await resolveUrlByAndroid(url);
     }
 
-    // それ以外は tag 付与（完全な正規化はしない）
-    if(hasAmazonTag(url)) return overwriteAmazonTagToMine(url);
-    return overwriteAmazonTagToMine(url + (url.includes("?") ? "&" : "?") + "tag=" + AMAZON_TAG);
+    // 4) 解決後に amazon.co.jp なら正規化＆tag付与
+    if(isAmazonCoJp(url)){
+      return normalizeAmazonCoJp(url);
+    }
+
+    // 5) amazon.co.jp 以外に落ちたら、無理に tag を付けない（安全側）
+    return url;
   }
 
   function generateRakutenLink(url){
@@ -413,21 +488,12 @@ function hasTag(text, tag){
     return null;
   }
 
-  // 本文中の「最初のURLだけ」置換（仕様：最初のURLが投稿対象）
   function replaceFirstUrl(text, newUrl){
     return (text || "").replace(/https?:\/\/[^\s]+/i, newUrl);
   }
 
-  /* =============================
-     「投稿文を生成」：本文は消さない
-     - 既存本文は保持
-     - 先頭に必要なハッシュタグだけ追加（重複しない）
-     - 最初のURLだけアフィリ化して差し替え
-============================= */
   function buildRequiredTags(url){
     const tags = [];
-
-    // ブログなら追加
     if(isBlogUrl(url)) tags.push("#ブログ過去記事");
 
     if(isAmazon(url)){
@@ -437,54 +503,46 @@ function hasTag(text, tag){
     }else if(isYahoo(url)){
       tags.push("#Yahoo偵察", "#PR");
     }
-
     return tags;
   }
 
   function applyTagsPreservingBody(originalText, tags){
     let t = originalText || "";
-    // 既に入っていないものだけを「先頭にまとめて1行」で追加
     const missing = tags.filter(tag => !hasTag(t, tag));
     if(missing.length === 0) return t;
-
-    // 先頭に追加（既存本文はそのまま下へ）
     return missing.join(" ") + "\n" + t;
   }
 
-  document.getElementById("generate").onclick = () => {
-    let raw = textarea.value || "";
-    let url = extractFirstUrl(raw);
-    if(!url) url = (urlInput.value || "").trim();
-    if(!url) return;
+  // ★ここが重要：生成ボタンで「amazon.asia/amzn.asiaを解決→正規化→tag」
+  const genBtn = document.getElementById("generate");
+  if(genBtn){
+    genBtn.addEventListener("click", async () => {
+      let raw = textarea.value || "";
+      let url = extractFirstUrl(raw);
+      if(!url) url = (urlInput.value || "").trim();
+      if(!url) return;
 
-    // タイトル整形（Amazonのみ）：本文の1行目からURL抜いて軽く整形したい場合だけ
-    // ただし「本文を消さない」が優先なので、ここでは本文の文字列は基本触らない
+      let affUrl = url;
 
-    // URLをアフィリ化（最初のURLのみ差し替え）
-    let affUrl = url;
-
-    if(isAmazon(url)){
-      affUrl = generateAmazonLink(url) || url;
-      // amzn.to/asia は上書きしない
-      if(!/^https?:\/\/amzn\.(to|asia)\//i.test(affUrl)){
-        affUrl = overwriteAmazonTagToMine(affUrl);
+      if(isAmazon(url)){
+        // A方式：amazon.asia/amzn.asia のみ解決して amazon.co.jp なら正規化+tag
+        affUrl = await generateAmazonAffiliateUrl(url);
+      }else if(isRakuten(url)){
+        affUrl = generateRakutenLink(url) || url;
+      }else if(isYahoo(url)){
+        affUrl = generateYahooLink(url) || url;
       }
-    }else if(isRakuten(url)){
-      affUrl = generateRakutenLink(url) || url;
-    }else if(isYahoo(url)){
-      affUrl = generateYahooLink(url) || url;
-    }
 
-    if(affUrl && affUrl !== url){
-      raw = replaceFirstUrl(raw, affUrl);
-    }
+      if(affUrl && affUrl !== url){
+        raw = replaceFirstUrl(raw, affUrl);
+      }
 
-    // 必要タグを「足りない分だけ」付与（本文は残す）
-    const tags = buildRequiredTags(url);
-    raw = applyTagsPreservingBody(raw, tags);
+      const tags = buildRequiredTags(url);
+      raw = applyTagsPreservingBody(raw, tags);
 
-    textarea.value = raw;
-  };
+      textarea.value = raw;
+    });
+  }
 
   /* =============================
      VC制限：X/Instagram以外はNG
@@ -496,7 +554,6 @@ function hasTag(text, tag){
 
     if(!isVC) return {ok:true, url, text};
 
-    // VCは X と Instagram 以外NG
     const allow = (targetSnsName === "x" || targetSnsName === "instagram");
     if(!allow){
       alert("ValueCommerceのURLはこのSNSでは投稿できません。");
@@ -505,7 +562,6 @@ function hasTag(text, tag){
     return {ok:true, url, text};
   }
 
-  // Instagram用 VC sid/pid差し替え（未確定なので仮：コメントアウト実装）
   function replaceVcSidPidForInstagramIfNeeded(text){
     const url = extractFirstUrl(text);
     if(!isValueCommerce(url)) return text;
@@ -520,26 +576,21 @@ function hasTag(text, tag){
     // }catch(e){
     //   return text;
     // }
-
     return text;
   }
 
   /* =============================
      SNSボタン押下時の共通処理
-     - VC制限チェック
-     - （Instagramのみ）VC sid/pid差し替え（仮）
-     - クリップボードコピー
-     - 下書き保存（Android:saveDraft / Web:localStorage）
+     - コピーはSNSボタン押下時
+     - 下書き保存も同タイミング
 ============================= */
   function backupAndCopy(textToCopy){
-    // 下書き保存
     if(inAndroidApp){
       try{ window.Android.saveDraft(textToCopy); }catch(e){}
     }else{
       saveDraftWeb(textToCopy);
     }
 
-    // クリップボードへ
     if(inAndroidApp){
       try{ window.Android.copyToClipboard(textToCopy); return; }catch(e){}
     }
@@ -548,13 +599,12 @@ function hasTag(text, tag){
 
   function openOrPopup(url, winRefName){
     if(inAndroidApp){
-      // 外部へ（WebViewClientが外に出す）
       location.href = url;
       return;
     }
     let w = null;
     if(winRefName === "X") w = winX;
-    if(winRefName === "IG") w = null; // IGはweb fallbackしない（起動だけの想定）
+    if(winRefName === "IG") w = null;
     if(winRefName === "TH") w = winThreads;
     if(winRefName === "BSKY") w = winBsky;
     if(winRefName === "FB") w = winFb;
@@ -587,20 +637,17 @@ function hasTag(text, tag){
     };
   }
 
-  // Instagram（A方式：コピーしてアプリ/ブラウザを開くだけ）
+  // Instagram
   const btnIG = document.getElementById("btnInstagram");
   if(btnIG){
     btnIG.onclick = () => {
       const g = guardValueCommerceOrAlert("instagram");
       if(!g.ok) return;
 
-      // VCなら sid/pid を差し替える必要がある（未確定のため仮）
       let text = textarea.value || "";
       text = replaceVcSidPidForInstagramIfNeeded(text);
 
       backupAndCopy(text);
-
-      // アプリ起動（WebViewClientが外に出す / Webならwebが開く）
       openOrPopup("https://www.instagram.com/", "IG");
     };
   }
