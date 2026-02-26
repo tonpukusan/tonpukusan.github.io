@@ -169,9 +169,45 @@ const VC_PID_X = "888362937";
 // const VC_SID_IG = "YOUR_INSTAGRAM_SID";
 // const VC_PID_IG = "YOUR_INSTAGRAM_PID";
 
-function extractFirstUrl(text){
-  return (text || "").match(/https?:\/\/[^\s]+/i)?.[0] || "";
+/**
+ * URL抽出（堅牢化）
+ * - 末尾に付きやすい句読点・括弧・引用符などを除去
+ * - URLとして parse できないものは落とす（ただし“軽く”）
+ */
+function cleanupUrlCandidate(s){
+  let t = (s || "").trim();
+  // よく巻き込む終端文字を削る（繰り返し対応）
+  // 例: "https://example.com/abc),"
+  while (/[)\]}>、。.,!?:;"'’”」》】]+$/.test(t)) {
+    t = t.replace(/[)\]}>、。.,!?:;"'’”」》】]+$/, "");
+  }
+  return t;
 }
+
+function extractUrls(text){
+  const src = (text || "");
+  const hits = src.match(/https?:\/\/[^\s]+/ig) || [];
+  const cleaned = [];
+  for(const h of hits){
+    const c = cleanupUrlCandidate(h);
+    if(!c) continue;
+    try{
+      // URLとして成立するものだけ採用（極端に厳密にはしない）
+      new URL(c);
+      cleaned.push(c);
+    }catch(e){
+      // parse失敗でも「元のまま入れた方が良い」ケースがあるので完全には捨てない
+      // ただし cleanup後が空or短すぎは捨てる
+      if(c.length >= 8) cleaned.push(c);
+    }
+  }
+  return cleaned;
+}
+
+function extractFirstUrl(text){
+  return extractUrls(text)[0] || "";
+}
+
 function isValueCommerce(url){
   return !!url && url.includes("ck.jp.ap.valuecommerce.com/servlet/");
 }
@@ -258,18 +294,29 @@ window.__posthubResolveCallback = function(reqId, resolvedUrl){
   }
 };
 
-function resolveUrlByAndroid(url){
+function resolveUrlByAndroid(url, timeoutMs = 4000){
   return new Promise((resolve) => {
     if(!canResolveByAndroid()) return resolve(url);
 
     const reqId = "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+
+    const timer = setTimeout(() => {
+      // タイムアウトしたらフォールバック
+      if(window.__posthubResolveDispatch && window.__posthubResolveDispatch[reqId]){
+        delete window.__posthubResolveDispatch[reqId];
+      }
+      resolve(url);
+    }, timeoutMs);
+
     window.__posthubResolveDispatch[reqId] = (resolved) => {
+      clearTimeout(timer);
       resolve(resolved || url);
     };
 
     try{
       window.Android.resolveUrlAsync(url, reqId);
     }catch(e){
+      clearTimeout(timer);
       delete window.__posthubResolveDispatch[reqId];
       resolve(url);
     }
@@ -452,16 +499,13 @@ function hasTag(text, tag){
     if(!originalUrl) return originalUrl;
 
     // 1) amzn.to は追跡しない＆いじらない（要件）
-    if(isAmznShort(originalUrl) && /^https?:\/\/amzn\.to\//i.test(originalUrl)) return originalUrl;
-
-    // amzn.to は追跡しない＆いじらない（要件）
     if(/^https?:\/\/amzn\.to\//i.test(originalUrl)) return originalUrl;
-    
-    // 3) amazon.asia / amzn.asia / amazon.asia は解決してから
+
+    // 2) amazon.asia / amzn.asia / amazon.asia は解決してから
     let url = originalUrl;
     if(isAmazonAsiaDomain(originalUrl)){
       const resolved = await resolveUrlByAndroid(originalUrl);
-    
+
       // 解決不能（または同一のまま）なら警告
       if((resolved || "") === originalUrl){
         alert("短縮URLを解決できませんでした（amzn.asia / amazon.asia）。そのまま投稿文に残します。");
@@ -469,13 +513,13 @@ function hasTag(text, tag){
       }
       url = resolved;
     }
-    
-    // 4) 解決後に amazon.co.jp なら正規化＆tag付与
+
+    // 3) 解決後に amazon.co.jp なら正規化＆tag付与
     if(isAmazonCoJp(url)){
       return normalizeAmazonCoJp(url);
     }
 
-    // 5) amazon.co.jp 以外に落ちたら、無理に tag を付けない（安全側）
+    // 4) amazon.co.jp 以外に落ちたら、無理に tag を付けない（安全側）
     return url;
   }
 
@@ -496,6 +540,8 @@ function hasTag(text, tag){
   }
 
   function replaceFirstUrl(text, newUrl){
+    // 互換維持のため：最初に見つかったURL（簡易regex）を置換
+    // ※抽出は堅牢化したが、置換の“対象の考え方”は現状に寄せる
     return (text || "").replace(/https?:\/\/[^\s]+/i, newUrl);
   }
 
@@ -520,7 +566,7 @@ function hasTag(text, tag){
     return missing.join(" ") + "\n" + t;
   }
 
-  // ★ここが重要：生成ボタンで「amazon.asia/amzn.asiaを解決→正規化→tag」
+  // ★生成ボタンで「amazon.asia/amzn.asiaを解決→正規化→tag」
   const genBtn = document.getElementById("generate");
   if(genBtn){
     genBtn.addEventListener("click", async () => {
@@ -552,21 +598,39 @@ function hasTag(text, tag){
   }
 
   /* =============================
-     VC制限：X/Instagram以外はNG
+     VC制限：X/Instagram以外はNG（堅牢化）
+     - 本文先頭URLだけでなく、本文内の全URL + urlInput をチェック
 ============================= */
+  function collectAllCandidateUrls(){
+    const text = textarea.value || "";
+    const urls = extractUrls(text);
+    const u2 = (urlInput.value || "").trim();
+    if(u2) urls.push(cleanupUrlCandidate(u2));
+    // 重複排除（順序維持）
+    const seen = new Set();
+    const uniq = [];
+    for(const u of urls){
+      if(!u) continue;
+      if(seen.has(u)) continue;
+      seen.add(u);
+      uniq.push(u);
+    }
+    return uniq;
+  }
+
   function guardValueCommerceOrAlert(targetSnsName){
     const text = textarea.value || "";
-    const url = extractFirstUrl(text);
-    const isVC = isValueCommerce(url);
+    const urls = collectAllCandidateUrls();
+    const hasVC = urls.some(u => isValueCommerce(u));
 
-    if(!isVC) return {ok:true, url, text};
+    if(!hasVC) return {ok:true, urls, text};
 
     const allow = (targetSnsName === "x" || targetSnsName === "instagram");
     if(!allow){
       alert("ValueCommerceのURLはこのSNSでは投稿できません。");
-      return {ok:false, url, text};
+      return {ok:false, urls, text};
     }
-    return {ok:true, url, text};
+    return {ok:true, urls, text};
   }
 
   function replaceVcSidPidForInstagramIfNeeded(text){
@@ -601,7 +665,18 @@ function hasTag(text, tag){
     if(inAndroidApp){
       try{ window.Android.copyToClipboard(textToCopy); return; }catch(e){}
     }
-    navigator.clipboard.writeText(textToCopy).catch(()=>{});
+
+    navigator.clipboard.writeText(textToCopy).catch(()=>{
+      // サイレント失敗をやめる（運用で困るので）
+      alert("クリップボードへのコピーに失敗しました。ブラウザの権限/設定をご確認ください。");
+    });
+  }
+
+  function safeWindowOpen(url, name){
+    // noopener/noreferrer で opener を切る（reverse tabnabbing対策）
+    const w = window.open(url, name, "noopener,noreferrer");
+    if(w) { try{ w.opener = null; }catch(e){} }
+    return w;
   }
 
   function openOrPopup(url, winRefName){
@@ -617,10 +692,10 @@ function hasTag(text, tag){
     if(winRefName === "FB") w = winFb;
 
     if(!w || w.closed){
-      w = window.open(url, "SNS_" + winRefName);
+      w = safeWindowOpen(url, "SNS_" + winRefName);
     }else{
       try{ w.location.href = url; w.focus(); }
-      catch(e){ w.close(); w = window.open(url, "SNS_" + winRefName); }
+      catch(e){ try{ w.close(); }catch(_){} w = safeWindowOpen(url, "SNS_" + winRefName); }
     }
 
     if(winRefName === "X") winX = w;
@@ -723,7 +798,7 @@ function hasTag(text, tag){
         location.href = pinterestUrl;
         return;
       }
-      window.open(pinterestUrl, "SNS_PINTEREST");
+      safeWindowOpen(pinterestUrl, "SNS_PINTEREST");
     };
   }
 
