@@ -61,7 +61,6 @@
     background:#fff;
   }
   .btn-small{ padding:8px 10px; font-size:.95rem; }
-  .btn-primary{ font-weight:700; border-color:#bbb; background:#f3f3f3; }
   .btn-danger{ background:#ff4d4d; color:#fff; border-color:#ff4d4d; }
 
   .image-box{
@@ -108,12 +107,8 @@
   }
 
   body{ padding-bottom:180px; }
-
-  .hint{
-    font-size: .85rem;
-    color:#666;
-    margin-top:4px;
-  }
+  .hint{ font-size:.85rem; color:#666; margin-top:4px; line-height:1.35; }
+  code{ background:#f3f3f3; padding:0 4px; border-radius:4px; }
 </style>
 </head>
 
@@ -132,7 +127,7 @@
     <button id="readClipboard" class="btn-small" style="display:none;">クリップボードから読み込む</button>
 
     <div class="hint">
-      ブラックリスト: <code>blacklist.txt</code>（1行1フレーズ、完全一致部分文字列を削除）
+      ブラックリスト: <code>blacklist.txt</code>（1行1語句、<b>| とスペースを除いた文字列</b>を記述）
     </div>
   </details>
 
@@ -174,36 +169,80 @@ const VC_SID_X = "3672888";
 const VC_PID_X = "888362937";
 
 /* =============================
-   ブラックリスト（方式C: blacklist.txt）
-   - 1行=1フレーズ
-   - 行頭が # の行はコメント扱い
-   - 空行は無視
-   - その行と完全一致する「部分文字列」があれば、本文から削除
+   ブラックリスト（方式C改: blacklist.txt）
+   仕様:
+   - blacklist.txt には「| やスペースを除いた除去対象文字列」を1行1つで記述
+   - 原文中で、その文字列の左右どちらかに
+     「| とスペース（全角/半角）が混在・連続しうる並び」が現れる場合、
+     その並び + 文字列 をセットで除去する
+   - 行頭が # の行はコメント扱い、空行は無視
+   注意:
+   - マッチは基本「完全一致（大小文字も区別）」です（誤爆を避けるため）
 ============================= */
-let SHARE_TEXT_BLACKLIST = []; // 外部ファイルから読み込み
+let BLACKLIST_TERMS = [];
 
 async function loadBlacklistTxt(){
   try{
     const res = await fetch("./blacklist.txt", { cache: "no-cache" });
     if(!res.ok) throw new Error("HTTP " + res.status);
     const text = await res.text();
-
-    // ※「完全一致する部分文字列」要件のため trim() はしない
-    // ただし CRLF → LF は揃える
     const lines = text.replace(/\r\n/g, "\n").split("\n");
-    SHARE_TEXT_BLACKLIST = lines
-      .filter(line => line.length > 0)
-      .filter(line => !line.startsWith("#"));
+    BLACKLIST_TERMS = lines
+      .map(l => l.replace(/\r/g, ""))      // 念のため
+      .map(l => l.trim())                  // blacklistは「|やスペース除外」なので trim は妥当
+      .filter(l => l.length > 0)
+      .filter(l => !l.startsWith("#"));
   }catch(e){
-    // 読み込み失敗でも動かす（空リスト）
-    SHARE_TEXT_BLACKLIST = [];
+    BLACKLIST_TERMS = [];
   }
 }
-
 const blacklistReady = loadBlacklistTxt();
 
+function escapeRegExp(s){
+  return (s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// 「| とスペース（半角/全角）」の連続。最低1つの | を含む並び。
+// 例: " | ", "  |", "|  ", "　|　", " |  | " など
+const PIPE_SPACE_SEQ = "(?:[\u3000\t ]*\|[\u3000\t ]*)+";
+
+/**
+ * ブラックリスト適用:
+ * - term の左に PIPE_SPACE_SEQ がある場合: それごと削除
+ * - term の右に PIPE_SPACE_SEQ がある場合: それごと削除
+ * どちらでも発火しうるので2パス（前後）で落とす
+ */
+function removeBlacklistedTermsWithPipesAndSpaces(text){
+  let t = (text || "");
+  if(!BLACKLIST_TERMS || BLACKLIST_TERMS.length === 0) return t;
+
+  for(const term of BLACKLIST_TERMS){
+    if(!term) continue;
+    const e = escapeRegExp(term);
+
+    // 左側の「|+スペース」付き: (pipes/spaces)+TERM
+    const reLeft  = new RegExp(PIPE_SPACE_SEQ + e, "g");
+    // 右側の「|+スペース」付き: TERM(pipes/spaces)+
+    const reRight = new RegExp(e + PIPE_SPACE_SEQ, "g");
+
+    t = t.replace(reLeft, "");
+    t = t.replace(reRight, "");
+  }
+
+  // 仕上げ（強くやりすぎない）
+  t = t
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t\u3000]+\n/g, "\n") // 行末空白を落とす
+    .replace(/\n{3,}/g, "\n\n")        // 空行増殖を抑える
+    .replace(/[ \t\u3000]{2,}/g, " ")   // 連続空白を軽く圧縮（全角含む）
+    .replace(/\s+\|\s+\|/g, " |")     // " |  |" が残った場合の軽い掃除
+    .trim();
+
+  return t;
+}
+
 /* =============================
-   共通ユーティリティ
+   URL抽出（軽い堅牢化）
 ============================= */
 function cleanupUrlCandidate(s){
   let t = (s || "").trim();
@@ -226,8 +265,10 @@ function extractUrls(text){
 }
 function extractFirstUrl(text){ return extractUrls(text)[0] || ""; }
 
+/* =============================
+   判定
+============================= */
 function isValueCommerce(url){ return !!url && url.includes("ck.jp.ap.valuecommerce.com/servlet/"); }
-function hasAmazonTag(url){ return /[?&]tag=/.test(url); }
 function hasRakutenAff(url){
   return url.includes("rafcid=") ||
          url.includes("scid=af_") ||
@@ -315,30 +356,6 @@ function resolveUrlByAndroid(url, timeoutMs = 4000){
       resolve(url);
     }
   });
-}
-
-/* =============================
-   ブラックリスト除去（完全一致部分文字列）
-============================= */
-function removeBlacklistedPhrases(text){
-  let t = (text || "");
-  if(!SHARE_TEXT_BLACKLIST || SHARE_TEXT_BLACKLIST.length === 0) return t;
-
-  for(const phrase of SHARE_TEXT_BLACKLIST){
-    if(!phrase) continue;
-    // 完全一致する部分文字列を全削除
-    t = t.split(phrase).join("");
-  }
-
-  // 仕上げ（見た目の崩れを少しだけ整える：強くやりすぎない）
-  t = t
-    .replace(/\r\n/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-
-  return t;
 }
 
 /* =============================
@@ -471,16 +488,16 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
       alert(
         "使い方：\n" +
         "1) 共有→本文が入る\n" +
-        "2) 必要なら追記して「投稿文を作成」（URL整形/タグ付与/ブラックリスト除去）\n" +
-        "3) SNSボタンを押すと本文がコピー＆下書き保存されます\n" +
-        "4) 各SNS側で貼り付け\n\n" +
-        "blacklist.txt: 1行1フレーズ（完全一致部分文字列を削除）"
+        "2) 必要なら追記して「投稿文を作成」（ブラックリスト除去→URL整形→タグ付与）\n" +
+        "3) SNSボタンを押すと本文がコピー＆下書き保存されます\n\n" +
+        "blacklist.txt: 1行1語句（|やスペースは書かない）\n" +
+        "原文中で語句の左右どちらかに『| とスペース（全角/半角）』が現れる場合に、セットで除去します。"
       );
     });
   }
 
   // 下書き（Webのみ localStorage）
-  const DRAFT_KEY = "posthub_draft_v3";
+  const DRAFT_KEY = "posthub_draft_v4";
   function saveDraftWeb(text){ try { localStorage.setItem(DRAFT_KEY, text); } catch(e) {} }
   function loadDraftWeb(){ try { return localStorage.getItem(DRAFT_KEY) || ""; } catch(e){ return ""; } }
   function clearDraftWeb(){ try { localStorage.removeItem(DRAFT_KEY); } catch(e) {} }
@@ -568,13 +585,12 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
   const genBtn = document.getElementById("generate");
   if(genBtn){
     genBtn.addEventListener("click", async () => {
-      // blacklist.txt を確実に読み込んでから適用
       await blacklistReady;
 
       let raw = textarea.value || "";
 
-      // 1) ブラックリスト除去（完全一致部分文字列）
-      raw = removeBlacklistedPhrases(raw);
+      // 1) ブラックリスト除去（新仕様）
+      raw = removeBlacklistedTermsWithPipesAndSpaces(raw);
 
       // 2) URL整形
       let url = extractFirstUrl(raw);
