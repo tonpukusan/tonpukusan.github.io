@@ -188,8 +188,8 @@ async function loadBlacklistTxt(){
     const text = await res.text();
     const lines = text.replace(/\r\n/g, "\n").split("\n");
     BLACKLIST_TERMS = lines
-      .map(l => l.replace(/\r/g, ""))      // 念のため
-      .map(l => l.trim())                  // blacklistは「|やスペース除外」なので trim は妥当
+      .map(l => l.replace(/\r/g, ""))
+      .map(l => l.trim())
       .filter(l => l.length > 0)
       .filter(l => !l.startsWith("#"));
   }catch(e){
@@ -203,14 +203,12 @@ function escapeRegExp(s){
 }
 
 // 「| とスペース（半角/全角）」の連続。最低1つの | を含む並び。
-// 例: " | ", "  |", "|  ", "　|　", " |  | " など
-const PIPE_SPACE_SEQ = "(?:[\u3000\t ]*\|[\u3000\t ]*)+";
+const PIPE_SPACE_SEQ = "(?:[\\u3000\\t ]*\\|[\\u3000\\t ]*)+";
 
 /**
  * ブラックリスト適用:
  * - term の左に PIPE_SPACE_SEQ がある場合: それごと削除
  * - term の右に PIPE_SPACE_SEQ がある場合: それごと削除
- * どちらでも発火しうるので2パス（前後）で落とす
  */
 function removeBlacklistedTermsWithPipesAndSpaces(text){
   let t = (text || "");
@@ -220,22 +218,19 @@ function removeBlacklistedTermsWithPipesAndSpaces(text){
     if(!term) continue;
     const e = escapeRegExp(term);
 
-    // 左側の「|+スペース」付き: (pipes/spaces)+TERM
     const reLeft  = new RegExp(PIPE_SPACE_SEQ + e, "g");
-    // 右側の「|+スペース」付き: TERM(pipes/spaces)+
     const reRight = new RegExp(e + PIPE_SPACE_SEQ, "g");
 
     t = t.replace(reLeft, "");
     t = t.replace(reRight, "");
   }
 
-  // 仕上げ（強くやりすぎない）
   t = t
     .replace(/\r\n/g, "\n")
-    .replace(/[ \t\u3000]+\n/g, "\n") // 行末空白を落とす
-    .replace(/\n{3,}/g, "\n\n")        // 空行増殖を抑える
-    .replace(/[ \t\u3000]{2,}/g, " ")   // 連続空白を軽く圧縮（全角含む）
-    .replace(/\s+\|\s+\|/g, " |")     // " |  |" が残った場合の軽い掃除
+    .replace(/[ \t\u3000]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t\u3000]{2,}/g, " ")
+    .replace(/\s+\|\s+\|/g, " |")
     .trim();
 
   return t;
@@ -383,7 +378,6 @@ async function generateAmazonAffiliateUrl(originalUrl){
 
   let url = originalUrl;
 
-  // amazon.asia / amzn.asia / amazon.asia は解決してから
   if(isAmazonAsiaDomain(originalUrl)){
     const resolved = await resolveUrlByAndroid(originalUrl);
     if((resolved || "") === originalUrl){
@@ -416,7 +410,7 @@ function replaceFirstUrl(text, newUrl){
   return (text || "").replace(/https?:\/\/[^\s]+/i, newUrl);
 }
 function hasTag(text, tag){
-  return new RegExp("(^|\s)" + tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\s|$)", "m").test(text || "");
+  return new RegExp("(^|\\s)" + tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)", "m").test(text || "");
 }
 function buildRequiredTags(url){
   const tags = [];
@@ -472,7 +466,12 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
    起動
 ============================= */
 (function(){
-  let winX=null, winThreads=null, winBsky=null, winFb=null;
+  let winX = null;
+  let winInstagram = null;
+  let winThreads = null;
+  let winBsky = null;
+  let winFb = null;
+  let winPinterest = null;
 
   const textarea=document.getElementById("text");
   const urlInput=document.getElementById("urlInput");
@@ -481,7 +480,6 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
   const isAndroidUA = /Android/.test(navigator.userAgent);
   const inAndroidApp = isAndroidApp();
 
-  // ヘルプ
   const helpBtn = document.getElementById("helpBtn");
   if(helpBtn){
     helpBtn.addEventListener("click", () => {
@@ -496,13 +494,11 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
     });
   }
 
-  // 下書き（Webのみ localStorage）
   const DRAFT_KEY = "posthub_draft_v4";
   function saveDraftWeb(text){ try { localStorage.setItem(DRAFT_KEY, text); } catch(e) {} }
   function loadDraftWeb(){ try { return localStorage.getItem(DRAFT_KEY) || ""; } catch(e){ return ""; } }
   function clearDraftWeb(){ try { localStorage.removeItem(DRAFT_KEY); } catch(e) {} }
 
-  // URLパラメータ（共有）
   const params=new URLSearchParams(location.search);
   const textParam=params.get("text")||"";
   const sharedUrl=params.get("url")||"";
@@ -534,13 +530,11 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
     urlInput.value=sharedUrl;
   }
 
-  // Androidでは「すべて閉じる」を隠す
   if (isAndroidUA) {
     const closeBtn = document.getElementById("closeAll");
     if (closeBtn) closeBtn.style.display = "none";
   }
 
-  // Androidだけ「下書きクリア」を表示
   const clearBtn = document.getElementById("clearDraft");
   if (isAndroidUA && clearBtn) {
     clearBtn.style.display = "block";
@@ -556,7 +550,6 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
     });
   }
 
-  // クリップボード読み込み（Androidだけ表示）
   if (isAndroidUA) {
     const readBtn = document.getElementById("readClipboard");
     if(readBtn) readBtn.style.display = "block";
@@ -581,7 +574,6 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
     });
   }
 
-  /* ===== 投稿文を作成 ===== */
   const genBtn = document.getElementById("generate");
   if(genBtn){
     genBtn.addEventListener("click", async () => {
@@ -589,10 +581,8 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
 
       let raw = textarea.value || "";
 
-      // 1) ブラックリスト除去（新仕様）
       raw = removeBlacklistedTermsWithPipesAndSpaces(raw);
 
-      // 2) URL整形
       let url = extractFirstUrl(raw);
       if(!url) url = (urlInput.value || "").trim();
       if(!url){
@@ -613,7 +603,6 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
         raw = replaceFirstUrl(raw, affUrl);
       }
 
-      // 3) タグ付与
       const tags = buildRequiredTags(url);
       raw = applyTagsPreservingBody(raw, tags);
 
@@ -638,34 +627,64 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
     });
   }
 
+  function getManagedWindow(refName){
+    if(refName === "X") return winX;
+    if(refName === "IG") return winInstagram;
+    if(refName === "TH") return winThreads;
+    if(refName === "BSKY") return winBsky;
+    if(refName === "FB") return winFb;
+    if(refName === "PINTEREST") return winPinterest;
+    return null;
+  }
+
+  function setManagedWindow(refName, w){
+    if(refName === "X") winX = w;
+    if(refName === "IG") winInstagram = w;
+    if(refName === "TH") winThreads = w;
+    if(refName === "BSKY") winBsky = w;
+    if(refName === "FB") winFb = w;
+    if(refName === "PINTEREST") winPinterest = w;
+  }
+
   function safeWindowOpen(url, name){
-    const w = window.open(url, name, "noopener,noreferrer");
-    if(w) { try{ w.opener = null; }catch(e){} }
-    return w;
+    try{
+      return window.open(url, name);
+    }catch(e){
+      return null;
+    }
   }
 
   function openOrPopup(url, winRefName){
     if(inAndroidApp){
       location.href = url;
-      return;
+      return null;
     }
-    let w = null;
-    if(winRefName === "X") w = winX;
-    if(winRefName === "TH") w = winThreads;
-    if(winRefName === "BSKY") w = winBsky;
-    if(winRefName === "FB") w = winFb;
+
+    let w = getManagedWindow(winRefName);
 
     if(!w || w.closed){
       w = safeWindowOpen(url, "SNS_" + winRefName);
     }else{
-      try{ w.location.href = url; w.focus(); }
-      catch(e){ try{ w.close(); }catch(_){} w = safeWindowOpen(url, "SNS_" + winRefName); }
+      try{
+        w.location.href = url;
+        w.focus();
+      }catch(e){
+        try{ w.close(); }catch(_){}
+        w = safeWindowOpen(url, "SNS_" + winRefName);
+      }
     }
 
-    if(winRefName === "X") winX = w;
-    if(winRefName === "TH") winThreads = w;
-    if(winRefName === "BSKY") winBsky = w;
-    if(winRefName === "FB") winFb = w;
+    setManagedWindow(winRefName, w);
+    return w;
+  }
+
+  function closeManagedWindow(w){
+    if(!w) return;
+    try{
+      if(!w.closed){
+        w.close();
+      }
+    }catch(e){}
   }
 
   // X
@@ -743,26 +762,49 @@ function guardValueCommerceOrAlert(targetSnsName, textareaEl, urlInputEl){
       if(inAndroidApp){
         location.href = pinterestUrl;
       }else{
-        safeWindowOpen(pinterestUrl, "SNS_PINTEREST");
+        openOrPopup(pinterestUrl, "PINTEREST");
       }
     };
   }
 
-  // 全SNSタブを閉じる（Webのみ）
   function closeAll(){
-    [winX, winThreads, winBsky, winFb].forEach(w=>{
-      if(w && !w.closed) w.close();
-    });
+    [
+      winX,
+      winInstagram,
+      winThreads,
+      winBsky,
+      winFb,
+      winPinterest
+    ].forEach(closeManagedWindow);
+
+    winX = null;
+    winInstagram = null;
+    winThreads = null;
+    winBsky = null;
+    winFb = null;
+    winPinterest = null;
   }
 
   const closeAllBtn = document.getElementById("closeAll");
   if(closeAllBtn){
     closeAllBtn.onclick = () => {
       if(inAndroidApp) return;
+
       closeAll();
-      window.close();
+
+      try{ window.open("", "_self"); }catch(e){}
+      try{ window.close(); }catch(e){}
+
+      setTimeout(() => {
+        try{
+          if(!window.closed){
+            location.replace("about:blank");
+          }
+        }catch(e){}
+      }, 100);
     };
   }
+
   if(!inAndroidApp){
     window.addEventListener("beforeunload", closeAll);
   }
